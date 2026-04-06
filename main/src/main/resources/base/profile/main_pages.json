@@ -1,0 +1,8 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/FloatBallPage",
+    "capabilities/floatingclock/FloatClockPage",
+    "capabilities/floatingstress/StressCapsulePage"
+  ]
+}

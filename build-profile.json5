@@ -1,0 +1,67 @@
+{
+  "app": {
+    "signingConfigs": [
+
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools",
+        "label": "$string:app_name",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "dev",
+        "signingConfig": "default",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools.dev",
+        "label": "$string:app_name_dev",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "main",
+      "srcPath": "./main",
+      "targets": [
+        {
+          "name": "product",
+          "applyToProducts": [
+            "default"
+          ]
+        },
+        {
+          "name": "dev",
+          "applyToProducts": [
+            "dev"
+          ]
+        }
+      ]
+    }
+  ]
+}

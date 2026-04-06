@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "SuperTools"
+    },
+    {
+      "name": "MainAbility_desc",
+      "value": "super tools"
+    },
+    {
+      "name": "MainAbility_label",
+      "value": "SuperTools"
+    },
+    {
+      "name": "tools_tab",
+      "value": "Tools"
+    },
+    {
+      "name": "setting_tab",
+      "value": "Setting"
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "超熵实验室"
+    },
+    {
+      "name": "app_name_dev",
+      "value": "超熵Dev"
+    },
+    {
+      "name": "module_desc",
+      "value": "超熵实验室"
+    },
+    {
+      "name": "MainAbility_desc",
+      "value": "超熵实验室"
+    },
+    {
+      "name": "MainAbility_label",
+      "value": "超熵实验室"
+    },
+    {
+      "name": "tools_tab",
+      "value": "工具箱"
+    },
+    {
+      "name": "setting_tab",
+      "value": "设置"
+    },
+    {
+      "name": "MicroPhonePermissions_desc",
+      "value": "屏幕录制时，录制麦克风声音。"
+    },
+    {
+      "name": "GET_WIFI_INFOPermissions_desc",
+      "value": "Web服务获取本机ip使用"
+    },
+    {
+      "name": "SYSTEM_FLOAT_WINDOWPermissions_desc",
+      "value": "Web服务保活使用闪控球需要"
+    },
+    {
+      "name": "BackRunningPermissions_desc",
+      "value": "保证录屏功能在应用切换到后台后可以正常运行。"
+    },
+    {
+      "name": "FloatWindowPermissions_desc",
+      "value": "保证后台悬浮相关功能可以正常运行。"
+    },
+    {
+      "name": "start_recording_hint",
+      "value": "点击开始录制"
+    },
+    {
+      "name": "stop_recording_hint",
+      "value": "点击停止录制"
+    },
+    {
+      "name": "empty_recording_list",
+      "value": "当前录制列表为空"
+    }
+  ]
+}

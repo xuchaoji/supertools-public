@@ -1,0 +1,100 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "Entroverse Lab"
+    },
+    {
+      "name": "app_name_dev",
+      "value": "Chao's Dev"
+    },
+    {
+      "name": "module_desc",
+      "value": "Entroverse Lab"
+    },
+    {
+      "name": "MainAbility_desc",
+      "value": "Entroverse Lab"
+    },
+    {
+      "name": "MainAbility_label",
+      "value": "Entroverse Lab"
+    },
+    {
+      "name": "tools_tab",
+      "value": "Tools"
+    },
+    {
+      "name": "setting_tab",
+      "value": "Setting"
+    },
+    {
+      "name": "MicroPhonePermissions_desc",
+      "value": "microphone permissions for screen record."
+    },
+    {
+      "name": "BackgroudTaskPermissions_desc",
+      "value": "basic permissions for screen record."
+    },
+    {
+      "name": "BackRunningPermissions_desc",
+      "value": "run screen record when app in background."
+    },
+    {
+      "name": "FloatWindowPermissions_desc",
+      "value": "run floating component."
+    },
+    {
+      "name": "GET_WIFI_INFOPermissions_desc",
+      "value": "get local ip for web server"
+    },
+    {
+      "name": "SYSTEM_FLOAT_WINDOWPermissions_desc",
+      "value": "keep web server by using floating ball"
+    },
+    {
+      "name": "Title_desc",
+      "value": "The Screen Recording Function Has Been Implemented"
+    },
+    {
+      "name": "Subtitle1_desc",
+      "value": "Record The Screen To A File Using The ArkTS Method"
+    },
+    {
+      "name": "Subtitle2_desc",
+      "value": "Record The Screen To A File Using The C/C++ Method"
+    },
+    {
+      "name": "Subtitle3_desc",
+      "value": "Record The Screen And Transcode It Into A Stream Using The C/C++ Method"
+    },
+    {
+      "name": "Toast_message",
+      "value": "Screen recording is in progress via another method. Access is temporarily unavailable"
+    },
+    {
+      "name": "Play_button",
+      "value": "Play"
+    },
+    {
+      "name": "Text_desc",
+      "value": "Screen recording file"
+    },
+    {
+      "name": "Initial_text_desc",
+      "value": "Please record the video first"
+    },
+    {
+      "name": "start_recording_hint",
+      "value": "Click to start recording"
+    },
+    {
+      "name": "stop_recording_hint",
+      "value": "Click to stop recording"
+    },
+    {
+      "name": "empty_recording_list",
+      "value": "Empty Recording List"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "apiType": "stageMode",
+  "buildOption": {
+    "sourceOption": {
+      "workers": [
+        './src/main/ets/workers/CalcWorker.ets',
+        './src/main/ets/workers/StressWorker.ets'
+      ]
+    }
+  },
+  "buildOptionSet": [
+    {
+      "name": "release",
+      "arkOptions": {
+        "obfuscation": {
+          "ruleOptions": {
+            "enable": false,
+            "files": [
+              "./obfuscation-rules.txt"
+            ]
+          }
+        }
+      }
+    },
+  ],
+  "targets": [
+    {
+      "name": "product",
+      "source": {
+        "sourceRoots": ['./src/product/']
+      }
+    },
+    {
+      "name": "dev",
+      "source": {
+        "sourceRoots": ['./src/dev/']
+      }
+    }
+  ]
+}
