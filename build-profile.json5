@@ -1,7 +1,19 @@
 {
   "app": {
     "signingConfigs": [
-
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_mHPfxrMTE6fnJJ6Z2fgMTUkZEnSmDz5kAlzh0ZdSXng=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B2914B56A70B1A721B080D14A658BE5ACB5C8EC4A9EB649289CD31F1DD9FAD32FF8381804FDC69F",
+          "profile": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_mHPfxrMTE6fnJJ6Z2fgMTUkZEnSmDz5kAlzh0ZdSXng=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_mHPfxrMTE6fnJJ6Z2fgMTUkZEnSmDz5kAlzh0ZdSXng=.p12",
+          "storePassword": "0000001BB7CF986C69D2458792E9AF512740A6FE78E3CA566F69CB0D236D5A424F048AA97ACD44B9EFD2B0"
+        }
+      }
     ],
     "products": [
       {

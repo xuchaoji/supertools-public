@@ -57,6 +57,14 @@ export struct HomePage {
       onClick: (event) => {
         HMRouterMgr.push({ pageUrl: PageNames.STR_CONVERT })
       }
+    },
+    {
+      name: '设备信息',
+      desc: '系统、屏幕、电池等硬件参数',
+      icon: $r('app.media.deviceinfo'),
+      onClick: (event: ClickEvent) => {
+        HMRouterMgr.push({ pageUrl: PageNames.DEVICE_INFO_PAGE })
+      }
     }
   ];
   @Local itemData: DragCardModel = new DragCardModel();

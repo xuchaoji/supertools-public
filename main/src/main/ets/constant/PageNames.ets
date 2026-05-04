@@ -7,4 +7,5 @@ export class PageNames {
   public static readonly CALC_PAGE = 'calcPage';
   public static readonly STR_CONVERT = 'stringConvertPage';
   public static readonly LOCAL_WEB_PAGE = 'localWebPage';
+  public static readonly DEVICE_INFO_PAGE = 'deviceInfoPage';
 }
