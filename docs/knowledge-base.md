@@ -24,6 +24,7 @@
 - 悬浮时钟 / 悬浮压测小窗
 - 本地 Web 服务 (TCP Socket HTTP Server)
 - 字符串编解码 (Base64 / URL)
+- 设备信息 (硬件规格、屏幕、内存、电池、存储实时监控)
 
 ---
 
@@ -303,6 +304,11 @@ HMRouterMgr.push({
 ```typescript
 export class PageNames {
   public static readonly HOME_PAGE: string = 'HomePage';
+  public static readonly SCREEN_RECORD: string = 'ScreenRecordPage';
+  public static readonly CALC_PAGE = 'calcPage';
+  public static readonly STR_CONVERT = 'stringConvertPage';
+  public static readonly LOCAL_WEB_PAGE = 'localWebPage';
+  public static readonly DEVICE_INFO_PAGE = 'deviceInfoPage';
   // ... 新增页面在此添加
 }
 ```
@@ -446,6 +452,89 @@ AppUtil.getBoolean('key', false);    // 读取
 AppUtil.putBoolean('key', true);     // 写入
 ```
 
+### 6.9 设备信息 API
+
+```typescript
+import { deviceInfo } from '@kit.BasicServicesKit';
+import { batteryInfo } from '@kit.BasicServicesKit';
+import { display } from '@kit.ArkUI';
+import { hidebug } from '@kit.PerformanceAnalysisKit';
+import statfs from '@ohos.file.statvfs';
+
+// 设备硬件
+deviceInfo.productModel   // 设备型号
+deviceInfo.brand          // 品牌
+deviceInfo.manufacture    // 制造商
+deviceInfo.hardwareProfile // 硬件配置 (如 "arm64-v8a 2.8GHz*4+1.9GHz*4")
+deviceInfo.abiList        // CPU 架构 (如 "arm64-v8a")
+deviceInfo.osFullName     // OS 完整版本号
+deviceInfo.sdkApiVersion  // SDK API 级别
+
+// 屏幕
+const d = display.getDefaultDisplaySync();
+d.width / d.height         // 屏幕宽高 (px)
+d.densityPixels / d.densityDPI // 像素密度
+d.refreshRate              // 刷新率 (Hz)
+
+// 内存 - hidebug.getSystemMemInfo() 返回单位是 KB
+const mem = hidebug.getSystemMemInfo();
+mem.totalMem     // 总内存 (KB)
+mem.availableMem // 可用内存 (KB)
+mem.freeMem      // 空闲内存 (KB)
+
+// 电池 - batteryInfo.voltage 单位是 µV, chargingStatus 是 BatteryPluggedType 枚举
+batteryInfo.batterySOC      // 电量百分比 (number)
+batteryInfo.chargingStatus  // 0=NONE, 1=AC, 2=USB, 3=WIRELESS (非0即充电)
+batteryInfo.healthStatus    // 健康状态枚举
+batteryInfo.technology      // 电池技术 (如 "Li-poly")
+batteryInfo.voltage         // 电压 (µV, 需 /1000000 转 V)
+
+// 存储 - 用应用沙箱根路径查询分区信息
+const context = getContext(this) as common.UIAbilityContext;
+const root = context.filesDir.substring(0, context.filesDir.indexOf('/files'));
+statfs.getTotalSizeSync(root)  // 分区总大小 (bytes)
+statfs.getFreeSizeSync(root)   // 分区剩余大小 (bytes)
+```
+
+### 6.10 ArkUI V2 实时刷新模式
+
+在 `@ComponentV2` 中实现定时刷新 UI 的正确方式：
+
+```
+setInterval → 更新 @ObservedV2.@Trace 属性 → build() 中直接读取 Text(this.xxx) → UI 自动更新
+```
+
+**关键原则：**
+- 动态数据必须用 `@ObservedV2` 类 + `@Trace` 属性包装，`@ComponentV2` 中用 `@Local` 持有该对象实例
+- `build()` 中直接 `Text(this.state.property)` 读取 `@Trace` 属性，不要通过嵌套 `@Builder` 传参
+- 嵌套 `@Builder` 在 V2 中不建立 `@Local` → UI 的响应式依赖链，会导致数据变更不刷新
+- `@Builder` 仅用于静态模板（一次性渲染数据如设备型号、屏幕参数等）
+- `setInterval` 中的箭头函数保持 `this` 绑定，可直接修改 `@Local` / `@Trace`
+
+**示例 — 电池充电状态实时刷新：**
+```typescript
+@ObservedV2
+class BatteryState {
+  @Trace charging: string = '-';
+}
+
+@ComponentV2
+struct MyPage {
+  @Local battery: BatteryState = new BatteryState();
+
+  aboutToAppear(): void {
+    this.refreshTimer = setInterval(() => {
+      this.battery.charging = batteryInfo.chargingStatus > 0 ? '正在充电' : '未充电';
+    }, 2000);
+  }
+
+  build() {
+    // 直接读取 @Trace 属性，不经过 @Builder 传参
+    Text(this.battery.charging)
+  }
+}
+```
+
 ---
 
 ## 7. 构建系统
@@ -559,12 +648,14 @@ if (TargetConstants.IS_AG_TARGET) {
    }
    ```
 
-2. **注册路由常量**: 在 `constant/PageNames.ets` 中添加
+2. **创建 / 引用图标资源**: 在 `devRes/` 下放置对应 SVG 图标（24×24 尺寸），然后在代码中以 `$r('app.media.xxx')` 引用（文件名去掉扩展名）。
+
+3. **注册路由常量**: 在 `constant/PageNames.ets` 中添加
    ```typescript
    public static readonly NEW_TOOL_PAGE = 'newToolPage';
    ```
 
-3. **在 HomePage 工具列表中添加入口**: 编辑 `pages/HomePage.ets` 中的 `listData` 数组
+4. **在 HomePage 工具列表中添加入口**: 编辑 `pages/HomePage.ets` 中的 `listData` 数组
    ```typescript
    {
      name: '新工具',
@@ -573,6 +664,8 @@ if (TargetConstants.IS_AG_TARGET) {
      onClick: () => { HMRouterMgr.push({ pageUrl: PageNames.NEW_TOOL_PAGE }) }
    }
    ```
+
+> 注意：通过 `@HMRouter` 注册的页面不需要在 `main_pages.json` 中额外注册。
 
 ### 10.2 新增一个 Capability 模块
 
@@ -640,10 +733,18 @@ console.log(`width=${d.width}, height=${d.height}, density=${d.densityPixels}`);
 
 ---
 
-## 12. 被废弃 / 禁止使用的 API
+## 12. 被废弃 / 禁止使用的 API 与已知陷阱
 
 通过代码审查发现的规则：
 - 不使用 `gridSpan` (已弃用)，改用 `constraintSize`
 - 不使用 `@Builder` 中的 `Text` 子组件在 `Column` 内添加点击事件（某些场景限制）
 - `Row` 组件不使用 `minHeight` 属性，改用 `.constraintSize({ minHeight: '100vp' })`
 - `backgroundBlurStyle` 已弃用，替代为 `backgroundBlurStyle`（注意拼写，已迁移）
+
+### ArkUI V2 响应式陷阱
+
+- **嵌套 `@Builder` 传参不建立响应式链**：在 `@ComponentV2` 的 `build()` 中，如果 `@Local` 变量通过参数传递给嵌套的 `@Builder`（如 `this.liveRow(label, this.batSOC)`），该嵌套 `@Builder` 不会随 `@Local` 变化重新执行。正确做法是将 `this.batSOC` 直接写在 `build()` 层的 `Text()` 中，或者使用 `@ComponentV2` 子组件 + `@Param` 传递。
+- **动态数据须用 `@ObservedV2` + `@Trace`**：需要定时刷新的数据应封装在 `@ObservedV2` 类内，属性用 `@Trace` 装饰，组件用 `@Local` 持有对象实例。
+- **`@Local` 对数组仅检测引用变更**：`@Local items = [...]` 会触发重渲染，但数组内对象属性变更不会。如需数组内元素属性级刷新，元素类须用 `@ObservedV2` + `@Trace`。
+- **`batteryInfo.voltage` 单位是 µV**：需除以 1000000 转换为 V。
+- **`hidebug.getSystemMemInfo()` 返回单位是 KB**：需除以 1024 转换为 MB。
