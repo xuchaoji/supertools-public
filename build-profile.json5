@@ -5,13 +5,26 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
+          "certpath": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001A26A6E201D1984A41F98CD733953BA3B0D422C943A21D25A8ABBF95441BBB38877EB426BA3C8A",
-          "profile": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
+          "keyPassword": "0000001A51CF885F9C88BC226C97038E67381BC6D8AC5D2DAD90C45207251348927A979B13BDBD3339A3",
+          "profile": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
-          "storePassword": "0000001A42D4F8369BCBD981C2A429E607F061E8B11C04E812B6707C1BE8207C4F99EEBECA8FEE4362E4"
+          "storeFile": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
+          "storePassword": "0000001ACE20C64E9C9A66F69A536247A6CA5C85FD20728916C63C37A25605F46F3E45E097415A45FF8A"
+        }
+      },
+      {
+        "name": "dev",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001A16EBD82F6F234D10665A1281BC2C5AC2AF77B5CEA640E98FBDAE416E1AACE28E8011906F823A",
+          "profile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
+          "storePassword": "0000001A41FAE938E9E9EAB07CB8539BC4C46E539BE41AFE1ED1F8BF8B16509B9DFF218A495CC6037D0E"
         }
       }
     ],
@@ -33,7 +46,7 @@
       },
       {
         "name": "dev",
-        "signingConfig": "default",
+        "signingConfig": "dev",
         "targetSdkVersion": "5.0.5(17)",
         "compatibleSdkVersion": "5.0.5(17)",
         "runtimeOS": "HarmonyOS",

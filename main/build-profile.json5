@@ -27,13 +27,27 @@
     {
       "name": "product",
       "source": {
-        "sourceRoots": ['./src/product/']
+        "sourceRoots": ['./src/product/'],
+        "abilities": [
+          {
+            "name": "MainAbility",
+            "icon": "$media:layered_icon",
+            "label": "$string:MainAbility_label",
+          }
+        ]
       }
     },
     {
       "name": "dev",
       "source": {
-        "sourceRoots": ['./src/dev/']
+        "sourceRoots": ['./src/dev/'],
+        "abilities": [
+          {
+            "name": "MainAbility",
+            "icon": "$media:layered_icon",
+            "label": "$string:app_name_dev",
+          }
+        ]
       }
     }
   ]
