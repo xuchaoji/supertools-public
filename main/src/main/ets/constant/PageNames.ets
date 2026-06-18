@@ -8,4 +8,5 @@ export class PageNames {
   public static readonly STR_CONVERT = 'stringConvertPage';
   public static readonly LOCAL_WEB_PAGE = 'localWebPage';
   public static readonly DEVICE_INFO_PAGE = 'deviceInfoPage';
+  public static readonly APP_LINKING_TOOL = 'appLinkingTool';
 }

@@ -95,6 +95,16 @@
           ],
           "when": "always"
         }
+      },
+      {
+        "name": "ohos.permission.CAMERA",
+        "reason": "$string:CameraPermissions_desc",
+        "usedScene": {
+          "abilities": [
+            "EntryAbility"
+          ],
+          "when": "inuse"
+        }
       }
     ]
   }

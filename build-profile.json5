@@ -7,11 +7,11 @@
         "material": {
           "certpath": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001B02AA07BCA32376958245ACFB81B6BA65DB805FAD368BED5037096BB07385C98827C583A3789753",
+          "keyPassword": "0000001A26A6E201D1984A41F98CD733953BA3B0D422C943A21D25A8ABBF95441BBB38877EB426BA3C8A",
           "profile": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "C:\\Users\\chaoji\\.ohos\\config\\default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
-          "storePassword": "0000001B10A47B4C58D271195471941FC25C5993CACDC1CC5119517375DFD6FB213FA745F4695D56929613"
+          "storePassword": "0000001A42D4F8369BCBD981C2A429E607F061E8B11C04E812B6707C1BE8207C4F99EEBECA8FEE4362E4"
         }
       }
     ],

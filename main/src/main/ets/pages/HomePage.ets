@@ -27,11 +27,11 @@ export struct HomePage {
   private tabsController: TabsController = new TabsController();
   @Local listData: ToolCardItem[] = [
     {
-      name: '压测工具',
-      desc: '执行计算任务模拟设备高负载场景',
-      icon: $r('app.media.bench'),
+      name: 'App Linking 解析',
+      desc: '元服务/App链接深度拆解与跳转测试',
+      icon: $r('app.media.code'),
       onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.CALC_PAGE })
+        HMRouterMgr.push({ pageUrl: PageNames.APP_LINKING_TOOL })
       }
     },
     {
@@ -64,6 +64,14 @@ export struct HomePage {
       icon: $r('app.media.deviceinfo'),
       onClick: (event: ClickEvent) => {
         HMRouterMgr.push({ pageUrl: PageNames.DEVICE_INFO_PAGE })
+      }
+    },
+    {
+      name: '压测工具',
+      desc: '执行计算任务模拟设备高负载场景',
+      icon: $r('app.media.bench'),
+      onClick: (event: ClickEvent) => {
+        HMRouterMgr.push({ pageUrl: PageNames.CALC_PAGE })
       }
     }
   ];
