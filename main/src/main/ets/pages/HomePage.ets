@@ -1,9 +1,11 @@
 import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
 import { PageNames } from "../constant/PageNames";
+import { SpKeys } from "../constant/SpKeys";
 import { DragCardModel, ToolCardItem } from "../model/HomePageModel";
 import hilog from "@ohos.hilog";
 import { JSON } from "@kit.ArkTS";
-import { AppUtil } from "@pura/harmony-utils";
+import { AppUtil, PreferencesUtil } from "@pura/harmony-utils";
+import promptAction from '@ohos.promptAction';
 import { RecordViewModel } from "../viewmodel/RecordViewModel";
 import { media } from "@kit.MediaKit";
 import { SettingGroup } from "../components/SettingGroup";
@@ -23,6 +25,10 @@ const SETTING_TAB_INDEX = 1;
 @ComponentV2
 export struct HomePage {
   @Local currentIndex: number = 0;
+  @Local settingsClickCount: number = 0;
+  private lastSettingsClickTime: number = 0;
+  private readonly REQUIRED_CLICKS: number = 8;
+  private readonly CLICK_WINDOW_MS: number = 5000;
   private msgNum: number = 9999;
   private tabsController: TabsController = new TabsController();
   @Local listData: ToolCardItem[] = [
@@ -109,6 +115,19 @@ export struct HomePage {
     .onClick(() => {
       this.currentIndex = index;
       this.tabsController.changeIndex(this.currentIndex);
+      if (index === SETTING_TAB_INDEX) {
+        let now: number = Date.now();
+        if (now - this.lastSettingsClickTime > this.CLICK_WINDOW_MS) {
+          this.settingsClickCount = 0;
+        }
+        this.lastSettingsClickTime = now;
+        this.settingsClickCount++;
+        if (this.settingsClickCount >= this.REQUIRED_CLICKS) {
+          PreferencesUtil.put(SpKeys.ENABLE_SCAN_PARSE, true);
+          promptAction.showToast({ message: '扫码解析功能已启用', duration: 1500 });
+          this.settingsClickCount = 0;
+        }
+      }
     })
   }
 

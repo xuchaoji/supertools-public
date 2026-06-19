@@ -8,6 +8,8 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { customScan, scanCore, scanBarcode } from '@kit.ScanKit';
 import { camera } from '@kit.CameraKit';
 import { display } from '@kit.ArkUI';
+import { PreferencesUtil } from '@pura/harmony-utils';
+import { SpKeys } from '../constant/SpKeys';
 
 interface ScanViewControl {
   surfaceId: string;
@@ -23,6 +25,7 @@ export struct AppLinkingTool {
   @State inputUrl: string = '';
   @State parsedResult: ParsedURLResult = URLParserUtil.parse('');
   @State isScanning: boolean = false;
+  @State isScanVisible: boolean = false;
 
   private xCompController: XComponentController = new XComponentController();
   private surfaceId: string = '';
@@ -32,6 +35,7 @@ export struct AppLinkingTool {
   private isResourcesReady: boolean = false;
 
   aboutToAppear(): void {
+    this.isScanVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_SCAN_PARSE, false);
     let storedResult: string | undefined = AppStorage.get<string>('appLinkingScannedUrl');
     if (storedResult && storedResult.length > 0) {
       this.inputUrl = storedResult;
@@ -376,6 +380,7 @@ export struct AppLinkingTool {
           .height(44)
           .layoutWeight(1)
           .borderRadius(8)
+          .visibility(this.isScanVisible ? Visibility.Visible : Visibility.None)
           .onClick(() => this.startScan())
 
           Button() {
