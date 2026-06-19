@@ -7,24 +7,24 @@
         "material": {
           "certpath": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001A51CF885F9C88BC226C97038E67381BC6D8AC5D2DAD90C45207251348927A979B13BDBD3339A3",
+          "keyPassword": "0000001AEABDD1701CEBE05C1DBC45EDCD9617C3D2699095651489919F5EB1C261A97AEBA6296D5F6AE6",
           "profile": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
-          "storePassword": "0000001ACE20C64E9C9A66F69A536247A6CA5C85FD20728916C63C37A25605F46F3E45E097415A45FF8A"
+          "storePassword": "0000001A21F4F1E3181DF12742C6722BE2C9CB4D256A1D55A97FDF5234416D3175B0E894F7827911865E"
         }
       },
       {
         "name": "dev",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
+          "certpath": "C:/Users/chaoji/.ohos/config/dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001A16EBD82F6F234D10665A1281BC2C5AC2AF77B5CEA640E98FBDAE416E1AACE28E8011906F823A",
-          "profile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
+          "keyPassword": "0000001A1732F63DE1EEC146027B26E3D4C94401ACA6542DC1F10CF619FF8497CA558FC2CA70F5FE8632",
+          "profile": "C:/Users/chaoji/.ohos/config/dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
-          "storePassword": "0000001A41FAE938E9E9EAB07CB8539BC4C46E539BE41AFE1ED1F8BF8B16509B9DFF218A495CC6037D0E"
+          "storeFile": "C:/Users/chaoji/.ohos/config/dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
+          "storePassword": "0000001ADEEC05D03C559D5AFEE24D5E8B9ACA7317325F8946952AAD2177DCF5F607F2E04DB7E9EADF75"
         }
       }
     ],

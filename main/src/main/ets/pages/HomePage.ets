@@ -57,27 +57,30 @@ export struct HomePage {
       onClick: (event) => {
         HMRouterMgr.push({ pageUrl: PageNames.STR_CONVERT })
       }
-    },
-    {
-      name: '设备信息',
-      desc: '系统、屏幕、电池等硬件参数',
-      icon: $r('app.media.deviceinfo'),
-      onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.DEVICE_INFO_PAGE })
-      }
-    },
-    {
-      name: '压测工具',
-      desc: '执行计算任务模拟设备高负载场景',
-      icon: $r('app.media.bench'),
-      onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.CALC_PAGE })
-      }
     }
   ];
   @Local itemData: DragCardModel = new DragCardModel();
 
   aboutToAppear(): void {
+    if (!TargetConstants.IS_AG_TARGET) {
+      this.listData.push({
+        name: '设备信息',
+        desc: '系统、屏幕、电池等硬件参数',
+        icon: $r('app.media.deviceinfo'),
+        onClick: (event: ClickEvent) => {
+          HMRouterMgr.push({ pageUrl: PageNames.DEVICE_INFO_PAGE })
+        }
+      })
+    } else {
+      this.listData.push({
+        name: '压测工具',
+        desc: '执行计算任务模拟设备高负载场景',
+        icon: $r('app.media.bench'),
+        onClick: (event: ClickEvent) => {
+          HMRouterMgr.push({ pageUrl: PageNames.CALC_PAGE })
+        }
+      })
+    }
   }
 
   @Builder
