@@ -10,7 +10,7 @@
 |---|---|
 | 项目名 | supertools-public |
 | 应用 ID | `com.xuchaoji.hmos.supertools` |
-| 版本 | 2.0.2 (versionCode: 2000002) |
+| 版本 | 2.1.2 (versionCode: 2001002) |
 | 平台 | HarmonyOS (OpenHarmony) 5.0 |
 | SDK 版本 | API 12 (Stage 模型), SDK 5.0.5(17) |
 | 目标设备 | phone, tablet, 2in1 |
@@ -25,6 +25,8 @@
 - 悬浮时钟 (`capabilities/floatingclock/`，毫秒级实时显示)
 - 悬浮压测小窗 (`capabilities/floatingstress/`，CPU/MEM 实时圆环监控 + 强度滑动调节)
 - 本地 Web 服务 (TCP Socket HTTP Server，目录列表、文件/文件夹拖拽上传、MIME 类型识别、频控限速)
+- **服务自启动**：重启后自动恢复悬浮时钟、悬浮压测、Web 服务状态。（2.1.2 新增）
+- **服务自启动总开关**：设置页「服务自启动设置」控制是否记录各服务开关状态。关闭后不记录，每次启动用默认值。（2.1.2 新增）
 - 字符串编解码 (Base64 / URL)
 - 设备信息实时监控 (CPU 型号/架构、屏幕、内存、电池电压/充电状态/健康度、存储分区)
 
@@ -923,7 +925,112 @@ $r('app.string.setting_tab')
 
 ---
 
-## 13. 已知陷阱与注意事项
+## 13. 状态持久化分析 (2026-06-28)
+
+### 13.1 持久化现状
+
+**已持久化 (无需改动):**
+
+| 状态 | 所在位置 | 持久化方式 | 键名 |
+|---|---|---|---|
+| H265/H264 编码预设 | `RecordViewModel.recordingCache.preset` | `PersistenceV2` | `recording_cache` |
+| 录制麦克风开关 | `RecordViewModel.recordingCache.recordMic` | `PersistenceV2` | `recording_cache` |
+| 录屏记录列表 | `RecordViewModel.recordingCache.recordings` | `PersistenceV2` | `recording_cache` |
+| 隐私协议同意 | `PrivacyPage.ets` → `PreferencesUtil` | `Preferences` | `privacy_agree` |
+| 扫描解析开关 | `HomePage.ets` → `PreferencesUtil` | `Preferences` | `enable_scan_parse` |
+
+**已实现持久化 (2.1.2 新增):**
+
+| 状态 | 写入位置 | 读取/恢复位置 | 键名 | 默认值 |
+|---|---|---|---|---|
+| `floatingClockOn` | `HomePage.ets:~198` | `MainAbility.ets:~52` | `float_clock_on` | `false` |
+| `cpuStressOn` | `HomePage.ets:~217` | `MainAbility.ets:~66` | `cpu_stress_on` | `false` |
+| `isServerRunning` | `LocalWebPage.ets:~315` | `MainAbility.ets:~80` | `web_server_on` | `true` |
+
+### 13.2 服务自启动总开关 (2.1.2 新增)
+
+| 键名 | 默认值 | 位置 | 说明 |
+|---|---|---|---|
+| `auto_start_enabled` | `true` | `SpKeys.ets` | 总开关，控制是否记录各服务状态 |
+
+**总开关行为:**
+- **开启 (默认)**: 各服务开关变更时写入 Preferences，重启时从 Preferences 恢复
+- **关闭**: 不记录各服务开关状态，重启时全部使用默认值（Web服务=开，时钟/压测=关），关闭瞬间立即停止所有运行中服务
+
+**受控的写入点（通过 `auto_start_enabled` 守卫）:**
+```typescript
+// HomePage.ets - 悬浮时钟/压测 onChange
+if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
+  PreferencesUtil.put(SpKeys.FLOAT_CLOCK_ON, isOn);
+}
+
+// LocalWebPage.ets - toggleServer()
+if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
+  PreferencesUtil.put(SpKeys.WEB_SERVER_ON, isRunning);
+}
+```
+
+**恢复逻辑（MainAbility.restoreSavedState）:**
+```typescript
+// 1. 隐私未同意 → 跳过全部
+// 2. auto_start_enabled = false → restoreDefaults() (web服务默认启动)
+// 3. auto_start_enabled = true  → 从 Preferences 读取各键恢复
+```
+
+### 13.3 隐私同意后 Web 服务立即启动
+
+`PrivacyPage.startDefaultServices()`: 用户点击「同意」后立即启动 Web 服务器（不包含 BackgroundService，避免通知弹窗）。
+
+### 13.4 SpKeys 枚举
+
+```typescript
+export class SpKeys {
+  public static readonly PRIVACY_AGREE: string = 'privacy_agree';
+  public static readonly ENABLE_SCAN_PARSE: string = 'enable_scan_parse';
+  public static readonly FLOAT_CLOCK_ON: string = 'float_clock_on';
+  public static readonly CPU_STRESS_ON: string = 'cpu_stress_on';
+  public static readonly WEB_SERVER_ON: string = 'web_server_on';
+  public static readonly AUTO_START_ENABLED: string = 'auto_start_enabled';
+}
+```
+
+## 14. 自动化测试
+
+### 14.1 工具链
+
+| 工具 | 用途 | 命令示例 |
+|---|---|---|
+| `uitest dumpLayout` | 导出当前 UI 层级 JSON，含每个元素的 bounds/text/type | `uitest dumpLayout -p /data/local/tmp/layout.xml -b <bundleName>` |
+| `uitest uiInput click <x> <y>` | 在指定坐标点击 | `uitest uiInput click 889 1742` |
+| `uitest uiInput swipe <x1> <y1> <x2> <y2>` | 滑动操作 | `uitest uiInput swipe 540 1500 540 500 1000` |
+| `aa start/force-stop` | 启动/停止应用 | `aa start -a MainAbility -b <bundleName>` |
+| `snapshot_display` | 设备截图 | `snapshot_display` |
+| `netstat -tlnp` | 端口监听检查 | `netstat -tlnp` |
+| `hidumper -s WindowManagerService` | 窗口状态查询 | `hidumper -s WindowManagerService -a '-a'` |
+| `hilog -x -e <regex>` | 应用日志过滤 | `hilog -x -e StateRestore` |
+| `bm dump -n <bundleName>` | 应用信息查询 | `bm dump -n com.xuchaoji.hmos.supertools.dev` |
+| `cat <prefsPath>` | 读取 Preferences 文件 | `cat /data/app/el2/.../preferences/SP_HARMONY_UTILS_PREFERENCES` |
+
+### 14.2 UI 自动化工作流
+
+```
+1. hdc shell "uitest dumpLayout -p /data/local/tmp/layout.xml -b <bundle>"
+2. hdc file recv /data/local/tmp/layout.xml local_layout.xml
+3. 解析 JSON，找到目标元素的 bounds
+4. 计算中心坐标: x = (left+right)/2, y = (top+bottom)/2
+5. hdc shell "uitest uiInput click <x> <y>"
+6. 验证: Preferences / netstat / hidumper / hilog
+```
+
+### 14.3 Preferences 文件路径
+
+```
+/data/app/el2/100/base/<bundleName>/haps/main/preferences/SP_HARMONY_UTILS_PREFERENCES
+```
+
+格式: XML，根元素 `<preferences>`, 子元素 `<bool key="..." value="true/false"/>`。
+
+## 15. 已知陷阱与注意事项
 
 ### 13.1 已弃用 API
 - `gridSpan` → 改用 `constraintSize`
