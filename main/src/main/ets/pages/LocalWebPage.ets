@@ -1,5 +1,6 @@
 import { HMRouter } from '@hadss/hmrouter';
 import { PageNames } from '../constant/PageNames';
+import { SpKeys } from '../constant/SpKeys';
 import { WebServerUtil } from '../utils/WebServerUtil';
 import { BackgroundTaskUtil } from '../utils/BackgroundTaskUtil';
 import { FloatWindowUtil } from '../utils/FloatWindowUtil';
@@ -10,6 +11,7 @@ import { promptAction } from '@kit.ArkUI';
 import { pasteboard } from '@kit.BasicServicesKit';
 import { BackgroundServiceManager } from '../utils/BackgroundServiceManager';
 import { TargetConstants } from 'main/ets/TargetConstants';
+import { AppUtil, PreferencesUtil } from '@pura/harmony-utils';
 
 // --- 类型定义 ---
 interface MenuElement {
@@ -310,6 +312,10 @@ export struct LocalWebPage {
     if (this.viewModel.isServerRunning) {
       server.stop();
       this.viewModel.isServerRunning = false;
+      if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
+        PreferencesUtil.put(SpKeys.WEB_SERVER_ON, false);
+        console.info('[StateRestore] put WEB_SERVER_ON = false');
+      }
       if (TargetConstants.HAS_FLOATING_PERM) {
         FloatWindowUtil.destroyFloatWindow();
       }
@@ -318,6 +324,10 @@ export struct LocalWebPage {
       server.start().then(() => {
         this.viewModel.isServerRunning = true;
         this.viewModel.serverIp = server.getIpAddress();
+        if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
+          PreferencesUtil.put(SpKeys.WEB_SERVER_ON, true);
+          console.info('[StateRestore] put WEB_SERVER_ON = true');
+        }
         if (TargetConstants.HAS_FLOATING_PERM) {
           FloatWindowUtil.showFloatWindow();
         }

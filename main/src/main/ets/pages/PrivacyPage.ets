@@ -6,6 +6,10 @@ import { PreferencesUtil } from '@pura/harmony-utils';
 import { SpKeys } from '../constant/SpKeys';
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
+import { WebServerUtil } from '../utils/WebServerUtil';
+import { FloatWindowUtil } from '../utils/FloatWindowUtil';
+import { GlobalContextHolder } from '../utils/GlobalContextHolder';
+import { TargetConstants } from 'main/ets/TargetConstants';
 
 const TAG: string = 'PrivacyPage';
 
@@ -34,8 +38,32 @@ export struct PrivacyPage {
   private saveUserAgreement(agreed: boolean) {
     try {
       PreferencesUtil.put(SpKeys.PRIVACY_AGREE, agreed)
+      if (agreed) {
+        this.startDefaultServices();
+      }
     } catch (err) {
       console.error('保存用户选择失败:', JSON.stringify(err));
+    }
+  }
+
+  private startDefaultServices() {
+    try {
+      const ctx = GlobalContextHolder.getInstance().uiAbilityContext;
+      if (!ctx) {
+        console.error('[PrivacyPage] context unavailable, skip default services');
+        return;
+      }
+      WebServerUtil.getInstance().init(ctx.filesDir + '/wwwroot', 8088);
+      WebServerUtil.getInstance().start().then(() => {
+        if (TargetConstants.HAS_FLOATING_PERM) {
+          FloatWindowUtil.showFloatWindow();
+        }
+        console.info('[PrivacyPage] web server started on privacy agreed');
+      }).catch((err: Object) => {
+        console.error('[PrivacyPage] web server start failed:', JSON.stringify(err));
+      });
+    } catch (e) {
+      console.error('[PrivacyPage] startDefaultServices failed:', JSON.stringify(e));
     }
   }
 

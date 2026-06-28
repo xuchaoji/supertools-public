@@ -15,6 +15,8 @@ import { GlobalContextHolder } from "../utils/GlobalContextHolder";
 import { FloatClockManager } from "../capabilities/floatingclock/FloatClockManager";
 import { StressFloatWindowManager } from "../capabilities/floatingstress/StressWindowManager";
 import { TargetConstants } from "main/ets/TargetConstants";
+import { WebServerUtil } from "../utils/WebServerUtil";
+import { FloatWindowUtil } from "../utils/FloatWindowUtil";
 
 const TAG: string = 'HOME_PAGE';
 
@@ -195,6 +197,10 @@ export struct HomePage {
             vis: TargetConstants.HAS_FLOATING_PERM,
             onChange: (isOn: boolean) => {
               CommonViewModel.getInstance().floatingClockOn = isOn;
+              if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
+                PreferencesUtil.put(SpKeys.FLOAT_CLOCK_ON, isOn);
+                console.info(`[StateRestore] put FLOAT_CLOCK_ON = ${isOn}`);
+              }
               const context = GlobalContextHolder.getInstance().uiAbilityContext;
               if (isOn && context) {
                 FloatClockManager.show(context);
@@ -210,12 +216,42 @@ export struct HomePage {
             vis: TargetConstants.HAS_FLOATING_PERM,
             onChange: (isOn: boolean) => {
               CommonViewModel.getInstance().cpuStressOn = isOn;
+              if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
+                PreferencesUtil.put(SpKeys.CPU_STRESS_ON, isOn);
+                console.info(`[StateRestore] put CPU_STRESS_ON = ${isOn}`);
+              }
               const context = GlobalContextHolder.getInstance().uiAbilityContext;
               if (isOn && context) {
                 StressFloatWindowManager.getInstance().show(context);
               } else {
                 StressFloatWindowManager.getInstance().hide();
                 CommonViewModel.getInstance().cpuStressOn = false;
+              }
+            }
+          })
+        }
+
+        Text('服务自启动设置:')
+          .margin({ left: '8vp', top: '16vp' })
+          .fontSize($r('sys.float.Body_L'))
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('sys.color.font_secondary'))
+
+        SettingGroup() {
+          SettingSwitchItem({
+            title: '启用服务自启动',
+            isOn: PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true),
+            onChange: (isOn: boolean) => {
+              PreferencesUtil.put(SpKeys.AUTO_START_ENABLED, isOn);
+              console.info(`[StateRestore] put AUTO_START_ENABLED = ${isOn}`);
+              if (!isOn) {
+                WebServerUtil.getInstance().stop();
+                FloatWindowUtil.destroyFloatWindow();
+                FloatClockManager.destroy();
+                StressFloatWindowManager.getInstance().hide();
+                CommonViewModel.getInstance().floatingClockOn = false;
+                CommonViewModel.getInstance().cpuStressOn = false;
+                console.info('[StateRestore] auto-start disabled, all services stopped');
               }
             }
           })

@@ -5,13 +5,19 @@ import {
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { display, window } from '@kit.ArkUI';
 import { HMRouterMgr } from '@hadss/hmrouter';
-import { AppUtil, GlobalContext } from '@pura/harmony-utils';
+import { AppUtil, GlobalContext, PreferencesUtil } from '@pura/harmony-utils';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
 import { BackgroundTaskUtil } from '../utils/BackgroundTaskUtil';
 import { FloatWindowUtil } from '../utils/FloatWindowUtil';
 import { BackgroundServiceManager } from '../utils/BackgroundServiceManager';
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
+import { SpKeys } from '../constant/SpKeys';
+import { CommonViewModel } from '../viewmodel/CommonViewModel';
+import { FloatClockManager } from '../capabilities/floatingclock/FloatClockManager';
+import { StressFloatWindowManager } from '../capabilities/floatingstress/StressWindowManager';
+import { WebServerUtil } from '../utils/WebServerUtil';
+import { TargetConstants } from 'main/ets/TargetConstants';
 
 const DOMAIN = 0x0000;
 
@@ -30,6 +36,88 @@ export default class MainAbility extends UIAbility {
     HMRouterMgr.init({
       context: this.context
     })
+    this.restoreSavedState();
+  }
+
+  restoreSavedState(): void {
+    const ctx = this.context;
+    const TAG = '[StateRestore]';
+
+    if (!PreferencesUtil.getBooleanSync(SpKeys.PRIVACY_AGREE, false)) {
+      console.info(`${TAG} privacy not agreed, skip all restore`);
+      return;
+    }
+
+    if (!PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
+      console.info(`${TAG} auto-start disabled, using defaults`);
+      this.restoreDefaults(TAG);
+      return;
+    }
+
+    try {
+      const clockOn = PreferencesUtil.getBooleanSync(SpKeys.FLOAT_CLOCK_ON, false);
+      console.info(`${TAG} reading FLOAT_CLOCK_ON = ${clockOn}`);
+      if (clockOn && ctx) {
+        CommonViewModel.getInstance().floatingClockOn = true;
+        FloatClockManager.show(ctx);
+        console.info(`${TAG} float clock restored`);
+      } else {
+        console.info(`${TAG} float clock skip (on=${clockOn}, ctx=${!!ctx})`);
+      }
+    } catch (e) {
+      console.error(`${TAG} restore float clock failed: ${JSON.stringify(e)}`);
+    }
+
+    try {
+      const stressOn = PreferencesUtil.getBooleanSync(SpKeys.CPU_STRESS_ON, false);
+      console.info(`${TAG} reading CPU_STRESS_ON = ${stressOn}`);
+      if (stressOn && ctx) {
+        CommonViewModel.getInstance().cpuStressOn = true;
+        StressFloatWindowManager.getInstance().show(ctx);
+        console.info(`${TAG} cpu stress restored`);
+      } else {
+        console.info(`${TAG} cpu stress skip (on=${stressOn}, ctx=${!!ctx})`);
+      }
+    } catch (e) {
+      console.error(`${TAG} restore cpu stress failed: ${JSON.stringify(e)}`);
+    }
+
+    try {
+      const wsOn = PreferencesUtil.getBooleanSync(SpKeys.WEB_SERVER_ON, true);
+      console.info(`${TAG} reading WEB_SERVER_ON = ${wsOn}`);
+      if (wsOn && ctx) {
+        WebServerUtil.getInstance().init(ctx.filesDir + '/wwwroot', 8088);
+        WebServerUtil.getInstance().start().then(() => {
+          const ip = WebServerUtil.getInstance().getIpAddress();
+          if (TargetConstants.HAS_FLOATING_PERM) {
+            FloatWindowUtil.showFloatWindow();
+          }
+          console.info(`${TAG} web server restored`);
+        }).catch((err: Object) => {
+          console.error(`${TAG} web server start failed: ${JSON.stringify(err)}`);
+        });
+      } else {
+        console.info(`${TAG} web server skip (on=${wsOn}, ctx=${!!ctx})`);
+      }
+    } catch (e) {
+      console.error(`${TAG} restore web server failed: ${JSON.stringify(e)}`);
+    }
+  }
+
+  restoreDefaults(TAG: string): void {
+    try {
+      WebServerUtil.getInstance().init(this.context.filesDir + '/wwwroot', 8088);
+      WebServerUtil.getInstance().start().then(() => {
+        if (TargetConstants.HAS_FLOATING_PERM) {
+          FloatWindowUtil.showFloatWindow();
+        }
+        console.info(`${TAG} web server started (default)`);
+      }).catch((err: Object) => {
+        console.error(`${TAG} web server default start failed: ${JSON.stringify(err)}`);
+      });
+    } catch (e) {
+      console.error(`${TAG} restoreDefaults failed: ${JSON.stringify(e)}`);
+    }
   }
 
   onDestroy(): void {
