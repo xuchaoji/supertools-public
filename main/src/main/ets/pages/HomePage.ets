@@ -1,4 +1,4 @@
-import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
+﻿import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
 import { PageNames } from "../constant/PageNames";
 import { SpKeys } from "../constant/SpKeys";
 import { DragCardModel, ToolCardItem } from "../model/HomePageModel";
@@ -64,6 +64,15 @@ export struct HomePage {
       icon: $r('app.media.code'),
       onClick: (event) => {
         HMRouterMgr.push({ pageUrl: PageNames.STR_CONVERT })
+      }
+    }
+    ,
+    {
+      name: 'HDC 调试',
+      desc: '本地 HDC 终端，直连 hdcd 调试本机',
+      icon: $r('app.media.crafting_table'),
+      onClick: (event: ClickEvent) => {
+        HMRouterMgr.push({ pageUrl: PageNames.HDC_DEBUG_PAGE })
       }
     }
   ];

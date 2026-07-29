@@ -1,0 +1,1 @@
+D:\DevEcoWorkSpace\supertools-public\supertools-public\hdc_napi\target\aarch64-unknown-linux-ohos\release\libhdc_napi.so: D:\DevEcoWorkSpace\supertools-public\supertools-public\hdc_napi\src\lib.rs
