@@ -1,11 +1,8 @@
-﻿import { BusinessError } from "@kit.BasicServicesKit";
-import nativeHdc from "libhdc_napi.so";
+import hilog from '@ohos.hilog';
+import nativeHdc from 'libhdc_z.so';
+import fs from '@ohos.file.fs';
 
-export interface HdcConnectionResult {
-  connected: boolean;
-  deviceCount?: number;
-  error?: string;
-}
+const TAG = 'HDC_Z';
 
 export interface HdcShellResult {
   exitCode: number;
@@ -13,68 +10,39 @@ export interface HdcShellResult {
   stderr: string;
 }
 
-export enum HdcConnectionState {
-  DISCONNECTED = 0,
-  CONNECTING = 1,
-  CONNECTED = 2
-}
-
-interface NativeHdcStatus {
-  connected: boolean;
-  device_count?: number;
-  error?: string;
-}
-
-interface NativeHdcOutput {
-  exit_code: number;
-  stdout: string;
-  stderr: string;
-}
-
 export class HdcService {
-  private host: string = "127.0.0.1";
-  private port: number = 8710;
+  private tempDir: string = '/data/storage/el2/base/haps/entry/temp/';
+  private serverStarted: boolean = false;
 
-  setTarget(host: string, port: number): void {
-    this.host = host;
-    this.port = port;
-  }
-
-  getTarget(): string {
-    return this.host + ":" + this.port;
-  }
-
-  async checkConnection(): Promise<HdcConnectionResult> {
+  startServer(): void {
+    if (this.serverStarted) { return; }
     try {
-      const status: NativeHdcStatus = nativeHdc.hdcCheckConnection(this.host, this.port);
-      return {
-        connected: status.connected,
-        deviceCount: status.device_count !== undefined ? status.device_count : undefined,
-        error: status.error !== undefined ? status.error : undefined
-      };
+      hilog.info(0x0000, TAG, 'hdcServer called from ArkTS');
+      nativeHdc.hdcServer(this.tempDir);
+      this.serverStarted = true;
+      hilog.info(0x0000, TAG, 'startServer: native hdcServer returned OK');
     } catch (e) {
-      return { connected: false, error: "napi failed: " + JSON.stringify(e) };
+      hilog.error(0x0000, TAG, 'startServer exception');
     }
   }
 
-  async execCommand(cmd: string): Promise<HdcShellResult> {
-    try {
-      const output: NativeHdcOutput = nativeHdc.hdcExecuteShell(cmd, this.host, this.port);
-      return {
-        exitCode: output.exit_code,
-        stdout: output.stdout,
-        stderr: output.stderr
-      };
-    } catch (e) {
-      return { exitCode: -1, stdout: "", stderr: "napi failed: " + JSON.stringify(e) };
-    }
+  execCommand(cmd: string): Promise<HdcShellResult> {
+    hilog.info(0x0000, TAG, 'execCommand: cmd=%{public}s', cmd);
+    let outPath = this.tempDir + 'hdc.out';
+    return new Promise<HdcShellResult>((resolve) => {
+      try { fs.unlinkSync(outPath); } catch (e) {}
+      nativeHdc.hdcCmd(cmd, this.tempDir, async (ret: number) => {
+        try {
+          let out = await fs.readText(outPath);
+          hilog.info(0x0000, TAG, 'execCommand: outputLen=%{public}d', out.length);
+          resolve({ exitCode: ret, stdout: out, stderr: '' });
+        } catch (e) {
+          hilog.info(0x0000, TAG, 'execCommand: no output file');
+          resolve({ exitCode: ret, stdout: '', stderr: '' });
+        }
+      });
+    });
   }
 
-  getReceivedHex(): string {
-    return "";
-  }
-
-  destroy(): void {
-    // NAPI connections are per-call, no persistent socket
-  }
+  destroy(): void { }
 }
