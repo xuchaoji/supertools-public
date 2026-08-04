@@ -704,12 +704,17 @@ static void EchoLog(string &buf)
     {
         va_list ap;
         va_start(ap, fmt);
-        if (vprintf(fmt, ap) > 0) {
-            printf("\n");
-        }
+        char buf[BUF_SIZE_DEFAULT4] = { 0 };
+        vsnprintf_s(buf, sizeof(buf), sizeof(buf) - 1, fmt, ap);
         va_end(ap);
+        if (buf[0]) {
+            printf("%s\n", buf);
+        }
         string outPath = g_tempDir + "hdc.out";
-        LogToPath(outPath.c_str(), fmt);
+        LogToPath(outPath.c_str(), buf);
+        if (buf[0]) {
+            LogToPath(outPath.c_str(), "\n");
+        }
     }
 
     void PrintMessageAndWriteLog(const char *fmt, ...)

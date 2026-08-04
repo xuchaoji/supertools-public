@@ -2,6 +2,9 @@
 #include "base.h"
 #include <string>
 #include <sys/stat.h>
+#include <cstdio>
+#include <unistd.h>
+#include <fcntl.h>
 
 #ifdef HILOG
 #include "hilog/log.h"
@@ -26,9 +29,20 @@ extern bool g_show;
 int cmd(int argc, const char *argv[], const char *tempPath)
 {
     HDCZ_LOG("cmd() start, argc=%{public}d", argc);
+    mkdir(tempPath, 0755);
     uv_os_setenv("USERPROFILE", tempPath);
     Hdc::Base::SetTempDir(tempPath);
-    Hdc::Base::SetLogLevel(Hdc::LOG_DEBUG);
+    Hdc::Base::SetLogLevel(Hdc::LOG_OFF);
+
+    string outPath = string(tempPath) + "hdc.out";
+    int outFd = open(outPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    int savedStdout = -1;
+    if (outFd >= 0) {
+        HDCZ_LOG("cmd() redirecting stdout to %{public}s fd=%{public}d", outPath.c_str(), outFd);
+        savedStdout = dup(STDOUT_FILENO);
+        dup2(outFd, STDOUT_FILENO);
+    }
+
     string options, commands;
     Hdc::SplitOptionAndCommand(argc, argv, options, commands);
     HDCZ_LOG("cmd() commands=%{public}s", commands.c_str());
@@ -44,6 +58,16 @@ int cmd(int argc, const char *argv[], const char *tempPath)
     HDCZ_LOG("cmd() RunClientMode(addr=%{public}s)", addr.c_str());
     Hdc::RunClientMode(commands, addr, key, pull);
     HDCZ_LOG("cmd() done");
+
+    if (outFd >= 0) {
+        fflush(stdout);
+        fsync(outFd);
+        if (savedStdout >= 0) {
+            dup2(savedStdout, STDOUT_FILENO);
+            close(savedStdout);
+        }
+        close(outFd);
+    }
     Hdc::Base::RemoveLogCache();
     return 0;
 }
@@ -54,7 +78,7 @@ int server(const char *tempPath)
     mkdir(tempPath, 0755);
     uv_os_setenv("USERPROFILE", tempPath);
     Hdc::Base::SetTempDir(tempPath);
-    Hdc::Base::SetLogLevel(Hdc::LOG_DEBUG);
+    Hdc::Base::SetLogLevel(Hdc::LOG_OFF);
     string listenStr = "::ffff:127.0.0.1:18710";
     HDCZ_LOG("server() calling RunServerMode(%{public}s)", listenStr.c_str());
     Hdc::RunServerMode(listenStr);

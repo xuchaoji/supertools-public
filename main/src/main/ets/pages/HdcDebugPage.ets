@@ -1,7 +1,8 @@
 ﻿import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
 import hilog from "@ohos.hilog";
-import { AppUtil } from "@pura/harmony-utils";
+import { AppUtil, PreferencesUtil } from "@pura/harmony-utils";
 import { HdcService, HdcShellResult } from "../utils/HdcService";
+import { connection } from "@kit.NetworkKit";
 
 type EntryType = "input" | "output" | "error" | "system";
 
@@ -19,6 +20,9 @@ export struct HdcDebugPage {
   @Local inputText: string = "";
   @Local isRunning: boolean = false;
   @Local serverReady: boolean = false;
+  @Local connectIp: string = "";
+  @Local connectPort: string = "";
+  @Local isConnected: boolean = false;
   private scroller: Scroller = new Scroller();
   private hdcService: HdcService = new HdcService();
 
@@ -27,6 +31,11 @@ export struct HdcDebugPage {
     this.addSystem("=== SuperTools HDC ===");
     this.addSystem("Starting HDC server...");
     this.hdcService.startServer();
+    PreferencesUtil.get("hdc_port", "").then((v) => {
+      if (v) { this.connectPort = v as string; }
+    });
+    this.getLocalIp();
+
     setTimeout(() => {
       this.serverReady = true;
       this.addSystem("Server ready");
@@ -36,6 +45,45 @@ export struct HdcDebugPage {
 
   aboutToDisappear(): void {
     this.hdcService.destroy();
+  }
+
+  private getLocalIp(): void {
+    try {
+      let nh = connection.getDefaultNetSync();
+      if (!nh) { return; }
+      let props = connection.getConnectionPropertiesSync(nh);
+      let addrs = props.linkAddresses || [];
+      for (let la of addrs) {
+        let na = la.address;
+        let ip: string = na.address as string || "";
+        if (!ip) { continue; }
+        if (ip.startsWith("192.168.") || (!ip.startsWith("127.") && ip.includes("10.")) || ip.includes("172.")) {
+          this.connectIp = ip;
+          return;
+        }
+      }
+    } catch (e) {
+      hilog.info(0x0000, "HDC_Z", "getLocalIp: %{public}s", JSON.stringify(e));
+    }
+  }
+
+  private async connectDevice(): Promise<void> {
+    let ip = this.connectIp.trim();
+    let port = this.connectPort.trim() || "8710";
+    if (!ip) return;
+    PreferencesUtil.put("hdc_port", port);
+    let cmd = "tconn " + ip + ":" + port;
+    this.addSystem("Connecting " + ip + ":" + port + "...");
+    this.isRunning = true;
+    let r = await this.hdcService.execCommand(cmd);
+    this.printResult(r);
+    this.isRunning = false;
+
+    if (r.stdout.indexOf("Connect OK") >= 0) {
+      this.isConnected = true;
+      this.addSystem("Connected. Listing targets...");
+      setTimeout(() => { this.executeQuick("list targets -v"); }, 500);
+    }
   }
 
   private async executeCommand(): Promise<void> {
@@ -75,6 +123,35 @@ export struct HdcDebugPage {
   private addInput(t: string): void { this.addEntry("input", "$ " + t); }
   private addOutput(t: string): void { this.addEntry("output", t); }
   private addError(t: string): void { this.addEntry("error", t); }
+
+  @Builder
+  connectBar() {
+    Column() {
+      Row({ space: 6 }) {
+        TextInput({ placeholder: "IP address", text: this.connectIp })
+          .onChange((v: string) => { this.connectIp = v; })
+          .fontSize(12).fontFamily("monospace").layoutWeight(3).height(36)
+          .backgroundColor("sys.color.background_primary").borderRadius(6)
+          .border({ width: 1, color: "sys.color.comp_background_emphasize" })
+          .padding({ left: 8, right: 8 })
+
+        TextInput({ placeholder: "Port", text: this.connectPort })
+          .onChange((v: string) => { this.connectPort = v; })
+          .fontSize(12).fontFamily("monospace").layoutWeight(1).height(36)
+          .backgroundColor("sys.color.background_primary").borderRadius(6)
+          .border({ width: 1, color: "sys.color.comp_background_emphasize" })
+          .type(InputType.Number)
+          .padding({ left: 6, right: 6 })
+
+        Button(this.isConnected ? "Recon" : "Conn")
+          .fontSize(12).fontColor(Color.White)
+          .backgroundColor(!this.isRunning ? "#28A745" : "#CCCCCC")
+          .borderRadius(6).height(36).padding({ left: 8, right: 8 })
+          .enabled(!this.isRunning)
+          .onClick(() => { this.connectDevice(); })
+      }.width("100%").padding({ top: 6, bottom: 4 })
+    }
+  }
 
   @Builder
   terminalColumns() {
@@ -167,6 +244,7 @@ export struct HdcDebugPage {
         .border({ width: 1, color: "sys.color.comp_background_emphasize" })
 
       Column() {
+        this.connectBar()
         this.quickBar()
         this.inputArea()
       }.width("100%").padding({ left: 12, right: 12, bottom: 12 })

@@ -68,6 +68,9 @@
         }
       },
       {
+        "name": "ohos.permission.GET_NETWORK_INFO",
+      },
+      {
         "name": "ohos.permission.MICROPHONE",
         "reason": "$string:MicroPhonePermissions_desc",
         "usedScene": {

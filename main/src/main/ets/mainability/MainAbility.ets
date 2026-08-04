@@ -18,6 +18,7 @@ import { FloatClockManager } from '../capabilities/floatingclock/FloatClockManag
 import { StressFloatWindowManager } from '../capabilities/floatingstress/StressWindowManager';
 import { WebServerUtil } from '../utils/WebServerUtil';
 import { TargetConstants } from 'main/ets/TargetConstants';
+import { HdcService } from '../utils/HdcService';
 
 const DOMAIN = 0x0000;
 
@@ -33,10 +34,23 @@ export default class MainAbility extends UIAbility {
     FloatWindowUtil.init(this.context);
     GlobalContextHolder.getInstance().uiAbilityContext = this.context;
     HMRouterMgr.openLog("INFO")
-    HMRouterMgr.init({
-      context: this.context
-    })
+    HMRouterMgr.init({ context: this.context })
     this.restoreSavedState();
+    this.initHdcServer();
+  }
+
+  initHdcServer(): void {
+    const hdc = new HdcService();
+    try {
+      hdc.startServer();
+      setTimeout(() => {
+        hdc.execCommand("list targets -v").then(r => {
+          hilog.info(DOMAIN, TAG, 'HDC cmd exit=%{public}d out=%{public}s', r.exitCode, r.stdout.substring(0, 200));
+        });
+      }, 3000);
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'HDC init failed');
+    }
   }
 
   restoreSavedState(): void {

@@ -6,6 +6,7 @@ import { display } from '@kit.ArkUI';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
 import { common } from '@kit.AbilityKit';
 import statfs from '@ohos.file.statvfs';
+import { connection } from '@kit.NetworkKit';
 
 const TAG: string = 'DeviceInfoPage';
 
@@ -38,6 +39,7 @@ export struct DeviceInfoPage {
   @Local deviceItems: InfoItem[] = [];
   @Local displayItems: InfoItem[] = [];
   @Local storageItems: InfoItem[] = [];
+  @Local networkItems: InfoItem[] = [];
   @Local memory: MemoryState = new MemoryState();
   @Local battery: BatteryState = new BatteryState();
   private refreshTimer: number = -1;
@@ -46,6 +48,7 @@ export struct DeviceInfoPage {
     this.collectDeviceInfo();
     this.collectDisplayInfo();
     this.collectStorageInfo();
+    this.collectNetworkInfo();
     this.refreshMemory();
     this.refreshBattery();
     this.refreshTimer = setInterval(() => {
@@ -152,6 +155,42 @@ export struct DeviceInfoPage {
     }
   }
 
+  collectNetworkInfo(): void {
+    const items: InfoItem[] = [];
+    try {
+      let nh = connection.getDefaultNetSync();
+      if (nh) {
+        let caps = connection.getNetCapabilitiesSync(nh);
+        let netType = "未知";
+        let types = caps?.bearerTypes || [];
+        if (types.length > 0) {
+          let t = types[0] as number;
+          netType = t === 0 ? "Wi-Fi" : t === 1 ? "蜂窝网络" : t === 2 ? "以太网" : t === 3 ? "VPN" : `类型${t}`;
+        }
+        items.push({ label: '网络类型', value: netType });
+
+        let props = connection.getConnectionPropertiesSync(nh);
+        let addrs = props.linkAddresses || [];
+        for (let la of addrs) {
+          let na = la.address;
+          let ip: string = na.address as string || "";
+          if (!ip || ip.startsWith("127.")) { continue; }
+          let prefix = ip.startsWith("192.168.") ? "局域网" : ip.startsWith("10.") ? "内网" : "";
+          items.push({ label: `${prefix} IP 地址`, value: ip });
+        }
+        if (addrs.length === 0) {
+          items.push({ label: 'IP 地址', value: '未获取到' });
+        }
+      } else {
+        items.push({ label: '网络状态', value: '未连接' });
+      }
+    } catch (e) {
+      console.error(`[${TAG}] collectNetworkInfo: ${JSON.stringify(e)}`);
+      items.push({ label: '获取失败', value: '请检查网络权限' });
+    }
+    this.networkItems = items;
+  }
+
   build() {
     Column() {
       Scroll() {
@@ -253,6 +292,7 @@ export struct DeviceInfoPage {
           .width('100%').margin({ top: '12vp' })
 
           this.StaticSection('存储信息', this.storageItems)
+          this.StaticSection('网络信息', this.networkItems)
         }
         .width('100%')
         .padding({ left: '16vp', right: '16vp', bottom: '32vp' })

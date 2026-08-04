@@ -11,7 +11,7 @@ export interface HdcShellResult {
 }
 
 export class HdcService {
-  private tempDir: string = '/data/storage/el2/base/haps/entry/temp/';
+  private tempDir: string = '/data/storage/el2/base/hdcz/';
   private serverStarted: boolean = false;
 
   startServer(): void {

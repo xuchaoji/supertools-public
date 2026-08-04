@@ -28,6 +28,7 @@ const SETTING_TAB_INDEX = 1;
 export struct HomePage {
   @Local currentIndex: number = 0;
   @Local settingsClickCount: number = 0;
+  @Local isHdcVisible: boolean = false;
   private lastSettingsClickTime: number = 0;
   private readonly REQUIRED_CLICKS: number = 8;
   private readonly CLICK_WINDOW_MS: number = 5000;
@@ -79,6 +80,11 @@ export struct HomePage {
   @Local itemData: DragCardModel = new DragCardModel();
 
   aboutToAppear(): void {
+    if (TargetConstants.IS_AG_TARGET) {
+      this.isHdcVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_HDC_VISIBLE, false);
+    } else {
+      this.isHdcVisible = true;
+    }
     if (!TargetConstants.IS_AG_TARGET) {
       this.listData.push({
         name: '设备信息',
@@ -135,7 +141,9 @@ export struct HomePage {
         this.settingsClickCount++;
         if (this.settingsClickCount >= this.REQUIRED_CLICKS) {
           PreferencesUtil.put(SpKeys.ENABLE_SCAN_PARSE, true);
-          promptAction.showToast({ message: '扫码解析功能已启用', duration: 1500 });
+          PreferencesUtil.put(SpKeys.ENABLE_HDC_VISIBLE, true);
+          this.isHdcVisible = true;
+          promptAction.showToast({ message: '扫码解析 + HDC调试功能已启用', duration: 1500 });
           this.settingsClickCount = 0;
         }
       }
@@ -356,6 +364,7 @@ export struct HomePage {
           })
           .borderRadius($r('sys.float.corner_radius_level4'))
           .border({ width: 1, color: '#1A000000' })
+          .visibility((item.name === 'HDC 调试' && !this.isHdcVisible) ? Visibility.None : Visibility.Visible)
         }, (item: ToolCardItem) => JSON.stringify(item))
       }
       .scrollBar(BarState.Off)
