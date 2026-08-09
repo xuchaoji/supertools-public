@@ -4,8 +4,7 @@ project(hdc_native)
 
 set(CMAKE_CXX_STANDARD 17)
 
-set(AUTO_INSTALLER_ROOT D:/DevEcoWorkSpace/auto-installer/flutter/hap_installer/cpp)
-set(HDC_SRC_ROOT ${AUTO_INSTALLER_ROOT}/hdctools/source)
+set(HDC_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/hdctools_src/source)
 set(THIRD_PARTY_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 
 # Skip cJSON tests (needs OHOS test framework headers)

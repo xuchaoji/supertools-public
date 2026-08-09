@@ -1,10 +1,9 @@
-# hdctools/CMakeLists.txt 閳?compiles HDC from auto-installer submodule sources
-# Adapter files (main.cpp, napi.cpp, server.cpp, auth.cpp) are local;
-# base.cpp from auto-installer is used directly (no local override needed).
-# HDC core source lives in auto-installer.
+# hdctools/CMakeLists.txt — compiles HDC from hdctools_src sources
+# Adapter files (main.cpp, napi.cpp, server.cpp, auth.cpp, server_for_client.cpp) are local;
+# base.cpp from hdctools_src is used directly (no local override needed).
 
-set(HDC_SRC_ROOT D:/DevEcoWorkSpace/auto-installer/flutter/hap_installer/cpp/hdctools/source)
-set(HDC_THIRD  D:/DevEcoWorkSpace/auto-installer/flutter/hap_installer/cpp/hdctools/third_party)
+set(HDC_SRC_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../hdctools_src/source)
+set(HDC_THIRD  ${CMAKE_CURRENT_SOURCE_DIR}/../hdctools_src/third_party)
 set(STUB_ROOT  ${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libusb/include)
 
 include_directories(
@@ -41,7 +40,7 @@ list(REMOVE_ITEM COMMON_SRCS "${HDC_SRC_ROOT}/src/common/hdc_huks.cpp")
 list(REMOVE_ITEM COMMON_SRCS "${HDC_SRC_ROOT}/src/common/password.cpp")
 
 
-# Override auto-installer's base.h with our adapter version (adds HDC_HILOG macros)
+# Override hdctools_src's base.h with our adapter version (adds HDC_HILOG macros)
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/base.h
     ${HDC_SRC_ROOT}/src/common/base.h
