@@ -135,17 +135,23 @@ export class HdcService {
     });
   }
 
-  /** Release the UI immediately when the user hits Cancel. */
+  /** Release the UI immediately when the user hits Cancel.
+   *  对持续抓取（如 hilog -x）：把当前已写入输出文件的部分内容一并返回，
+   *  供调用方保存为用户主动停止时抓到的日志。 */
   cancel(): void {
     if (this.pendingSettled || this.pendingResolve === null) { return; }
     this.pendingSettled = true;
     const resolve = this.pendingResolve;
     this.pendingResolve = null;
     if (this.pendingTimer >= 0) { clearTimeout(this.pendingTimer); this.pendingTimer = -1; }
-    this.cleanupRunDir(this.pendingRunDir);
+    let partial: string = '';
+    if (this.pendingRunDir) {
+      try { partial = fs.readTextSync(this.pendingRunDir + 'hdc.out'); } catch (e) { /* 尚无输出 */ }
+      this.cleanupRunDir(this.pendingRunDir);
+    }
     this.pendingRunDir = '';
     resolve({
-      exitCode: -1, stdout: '', stderr: 'cancelled', durationMs: -1,
+      exitCode: -1, stdout: partial, stderr: 'cancelled', durationMs: -1,
       timedOut: false, cancelled: true, error: ''
     });
   }
@@ -158,7 +164,9 @@ export class HdcService {
     resolve: (r: HdcShellResult) => void): Promise<void> {
     let stdout: string = '';
     let stderr: string = '';
+    hilog.info(0x0000, TAG, 'finishWithFiles: reading runDir=%{public}s', runDir);
     try { stdout = await fs.readText(runDir + 'hdc.out'); } catch (e) { /* no output */ }
+    hilog.info(0x0000, TAG, 'finishWithFiles: out read len=%{public}d', stdout.length);
     try { stderr = await fs.readText(runDir + 'hdc.err'); } catch (e) { /* no stderr */ }
     this.cleanupRunDir(runDir);
     resolve({

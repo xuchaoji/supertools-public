@@ -6,4 +6,6 @@ export class SpKeys {
   public static readonly CPU_STRESS_ON: string = 'cpu_stress_on';
   public static readonly WEB_SERVER_ON: string = 'web_server_on';
   public static readonly AUTO_START_ENABLED: string = 'auto_start_enabled';
+  public static readonly TOOL_ORDER: string = 'tool_order';
+  public static readonly HDC_DEBUG_LOG: string = 'hdc_debug_log';
 }

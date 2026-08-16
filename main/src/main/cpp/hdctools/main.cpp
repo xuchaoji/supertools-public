@@ -78,7 +78,8 @@ int cmd(int argc, const char *argv[], const char *tempPath)
 
     if (outFd >= 0) {
         fflush(stdout);
-        fsync(outFd);
+        // 不用 fsync：后台子进程（如 hilog）可能仍持有 fd 持续写入，
+        // fsync 会等待文件全部落盘导致 cmd() 卡死；ArkTS 侧只读 page cache 即可。
         if (savedStdout >= 0) {
             dup2(savedStdout, STDOUT_FILENO);
             close(savedStdout);
@@ -87,7 +88,6 @@ int cmd(int argc, const char *argv[], const char *tempPath)
     }
     if (errFd >= 0) {
         fflush(stderr);
-        fsync(errFd);
         if (savedStderr >= 0) {
             dup2(savedStderr, STDERR_FILENO);
             close(savedStderr);

@@ -104,6 +104,54 @@ export struct HomePage {
         }
       })
     }
+    // 恢复拖拽排序后的位置记忆
+    this.restoreToolOrder();
+  }
+
+  /** 保存当前工具卡片顺序（按 name） */
+  private saveToolOrder(): void {
+    try {
+      const names: string[] = this.listData.map((item: ToolCardItem) => String(item.name));
+      PreferencesUtil.putSync(SpKeys.TOOL_ORDER, JSON.stringify(names));
+    } catch (e) {
+      hilog.info(0x0000, TAG, 'saveToolOrder failed');
+    }
+  }
+
+  /**
+   * 按上次拖拽保存的顺序重排 listData：
+   * 已保存的工具按保存顺序排列；保存列表中没有的新增工具按默认顺序追加在末尾。
+   */
+  private restoreToolOrder(): void {
+    try {
+      const raw = PreferencesUtil.getStringSync(SpKeys.TOOL_ORDER, '');
+      if (!raw) { return; }
+      const saved: string[] = JSON.parse(raw) as string[];
+      if (!Array.isArray(saved) || saved.length === 0) { return; }
+      const byName = new Map<string, ToolCardItem>();
+      for (const item of this.listData) {
+        byName.set(String(item.name), item);
+      }
+      const ordered: ToolCardItem[] = [];
+      for (const name of saved) {
+        const item = byName.get(name);
+        if (item) {
+          ordered.push(item);
+          byName.delete(name);
+        }
+      }
+      // 保存列表中不存在的工具（后续新增）按默认顺序追加
+      for (const item of this.listData) {
+        if (byName.has(String(item.name))) {
+          ordered.push(item);
+        }
+      }
+      if (ordered.length === this.listData.length) {
+        this.listData = ordered;
+      }
+    } catch (e) {
+      hilog.info(0x0000, TAG, 'restoreToolOrder failed');
+    }
   }
 
   @Builder
@@ -316,55 +364,52 @@ export struct HomePage {
     Column() {
       Grid(new Scroller()) {
         ForEach(this.listData, (item: ToolCardItem) => {
-          GridItem() {
-            Row({ space: '16vp' }) {
-              Image(item.icon)
-                .width('64vp')
-                .height('64vp')
-                .interpolation(ImageInterpolation.None)
+          // HDC 调试在上架版默认隐藏：条件渲染避免 Grid 占位空洞
+          if (!(item.name === 'HDC 调试' && !this.isHdcVisible)) {
+            GridItem() {
+              Column({ space: 4 }) {
+                Image(item.icon)
+                  .width('44vp')
+                  .height('44vp')
+                  .interpolation(ImageInterpolation.None)
+                  .draggable(false)
 
-              Column({ space: '8vp' }) {
                 Text(item.name)
-                  .fontSize($r('sys.float.Body_L'))
-                  .fontColor($r('sys.color.icon_emphasize'))
+                  .fontSize(14)
+                  .fontColor($r('sys.color.font_primary'))
                   .fontWeight(FontWeight.Medium)
-                  .textAlign(TextAlign.Start)
-                  .margin({ right: $r('sys.float.padding_level2') })
+                  .maxLines(1)
                   .ellipsisMode(EllipsisMode.END)
+                  .textAlign(TextAlign.Center)
                   .width('100%')
+
                 Text(item.desc)
-                  .fontSize($r('sys.float.Body_M'))
-                  .fontColor($r('sys.color.icon'))
-                  .textAlign(TextAlign.Start)
-                  .margin({ right: $r('sys.float.padding_level2') })
+                  .fontSize(10)
+                  .fontColor($r('sys.color.font_secondary'))
                   .maxLines(2)
                   .ellipsisMode(EllipsisMode.END)
+                  .textAlign(TextAlign.Center)
                   .width('100%')
               }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
+              .justifyContent(FlexAlign.Center)
+              .alignItems(HorizontalAlign.Center)
+              .width('100%')
+              .height('100%')
+              .padding({ left: 6, right: 6, top: 10, bottom: 10 })
             }
-            .padding('16vp')
-            .alignItems(VerticalAlign.Center)
-            .width('100%')
-            .height('auto')
-            // 修复 Row 的 minHeight 报错，使用 constraintSize
-            .constraintSize({ minHeight: '100vp' })
+            .onClick((event) => {
+              item.onClick(event);
+            })
+            // 参考 ComprehensiveTool 网格卡片：淡蓝底 + 圆角 + 固定高度（避免行被拉伸填满屏幕）
+            .backgroundColor('rgba(10, 89, 247, 0.05)')
+            .borderRadius(12)
+            .border({ width: 1, color: 'rgba(10, 89, 247, 0.10)' })
+            .height(112)
+            .onAreaChange((oldValue: Area, newValue: Area) => {
+              this.itemData.width = (newValue.width as number) * 1.1;
+              this.itemData.height = (newValue.height as number) * 1.1;
+            })
           }
-          .onClick((event) => {
-            item.onClick(event);
-          })
-          // 使用半透明白色背景，防止在纯色背景下隐形，同时保留毛玻璃支持
-          .backgroundColor('rgba(255, 255, 255, 0.8)')
-          .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
-          .width('100%')
-          .onAreaChange((oldValue: Area, newValue: Area) => {
-            this.itemData.width = (newValue.width as number) * 1.1;
-            this.itemData.height = (newValue.height as number) * 1.1;
-          })
-          .borderRadius($r('sys.float.corner_radius_level4'))
-          .border({ width: 1, color: '#1A000000' })
-          .visibility((item.name === 'HDC 调试' && !this.isHdcVisible) ? Visibility.None : Visibility.Visible)
         }, (item: ToolCardItem) => JSON.stringify(item))
       }
       .scrollBar(BarState.Off)
@@ -384,16 +429,19 @@ export struct HomePage {
             this.listData[itemIndex] = this.listData[insertIndex];
             this.listData[insertIndex] = temp;
           })
+        // 持久化拖拽后的顺序，重启后保持
+        this.saveToolOrder();
       })
-      .columnsGap(16)
-      .rowsGap(16)
-      .columnsTemplate('1fr')
+      .columnsGap(8)
+      .rowsGap(8)
+      .columnsTemplate('1fr 1fr 1fr')
+      .padding(12)
+      .edgeEffect(EdgeEffect.Spring)
       // [Pad大屏适配]
       .constraintSize({ maxWidth: 800 })
     }
     .height('100%')
     .width('100%')
-    .padding({ left: '16vp', right: '16vp', top: '16vp' })
     .align(Alignment.Center)
   }
 }
