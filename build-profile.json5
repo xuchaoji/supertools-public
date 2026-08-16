@@ -5,26 +5,26 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
+          "certpath": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001A8AA088CF5F2DF972904CDD064E058376BE317AA197D923BFC97ACAC00DA7D0D5A55278E496A8",
-          "profile": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
+          "keyPassword": "0000001BBD2D8280E638C4A218A10097E14DBD0D78B31B2D64406581C24F44D853B0BE55A23B0EE5C4682B",
+          "profile": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:/Users/chaoji/.ohos/config/default_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
-          "storePassword": "0000001AAEEBB945028275CAEB5B6542CE3F35CC3B5F80B90D5DFDBCC25760DC56F10A8AAED67EA6615A"
+          "storeFile": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
+          "storePassword": "0000001BBE222E9A6C3CEE26B39AACE6A0613F9B07573B024FB6672C78DC04F6D47EEA1424325F7E02363B"
         }
       },
       {
         "name": "dev",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
+          "certpath": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001B1C2D7E5CCF28FAA218853072F9D03E1A165240A695CE543804E88B1FE4C6BB5FF87C6D3B2C4934",
-          "profile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
+          "keyPassword": "0000001BECE3FB5F514EF96906371F9E895259059A09E017EFDE00D3DEEEF8BB91B4467EB8CE906EB50E76",
+          "profile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
-          "storePassword": "0000001B94818CB0EDD701C5E2BC9B4A89405F58C12A3C35DD414F96542B6A6E936E9166180562605672A1"
+          "storeFile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
+          "storePassword": "0000001B7E989ECF6104E7B32C5ACE06B7808A59E141D54FA3A7D9D53572CF89BE989CFB0A20F927684E33"
         }
       }
     ],

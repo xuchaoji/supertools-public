@@ -1,4 +1,4 @@
-﻿import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
+import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
 import { PageNames } from "../constant/PageNames";
 import { SpKeys } from "../constant/SpKeys";
 import { DragCardModel, ToolCardItem } from "../model/HomePageModel";
@@ -85,16 +85,16 @@ export struct HomePage {
     } else {
       this.isHdcVisible = true;
     }
-    if (!TargetConstants.IS_AG_TARGET) {
-      this.listData.push({
-        name: '设备信息',
-        desc: '系统、屏幕、电池等硬件参数',
-        icon: $r('app.media.deviceinfo'),
-        onClick: (event: ClickEvent) => {
-          HMRouterMgr.push({ pageUrl: PageNames.DEVICE_INFO_PAGE })
-        }
-      })
-    } else {
+    // 设备信息：default / dev 两个 target 均默认可见
+    this.listData.push({
+      name: '设备信息',
+      desc: '系统、屏幕、电池等硬件参数',
+      icon: $r('app.media.deviceinfo'),
+      onClick: (event: ClickEvent) => {
+        HMRouterMgr.push({ pageUrl: PageNames.DEVICE_INFO_PAGE })
+      }
+    })
+    if (TargetConstants.IS_AG_TARGET) {
       this.listData.push({
         name: '压测工具',
         desc: '执行计算任务模拟设备高负载场景',
