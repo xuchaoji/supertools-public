@@ -1,6 +1,7 @@
-﻿#include "hdc.h"
+#include "hdc.h"
 #include "base.h"
 #include <string>
+#include <cstdlib>
 #include <sys/stat.h>
 #include <cstdio>
 #include <unistd.h>
@@ -26,6 +27,12 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[]);
 
 extern bool g_show;
 
+static string envOr(const char *name, const string &def)
+{
+    const char *v = getenv(name);
+    return (v != nullptr && *v != '\0') ? string(v) : def;
+}
+
 int cmd(int argc, const char *argv[], const char *tempPath)
 {
     HDCZ_LOG("cmd() start, argc=%{public}d", argc);
@@ -34,13 +41,23 @@ int cmd(int argc, const char *argv[], const char *tempPath)
     Hdc::Base::SetTempDir(tempPath);
     Hdc::Base::SetLogLevel(Hdc::LOG_OFF);
 
-    string outPath = string(tempPath) + "hdc.out";
+    // Output files may be overridden per-command (see napi.cpp) so that a
+    // cancelled/timed-out command never clobbers the next command's output.
+    string outPath = envOr("HDC_OUT_PATH", string(tempPath) + "hdc.out");
+    string errPath = envOr("HDC_ERR_PATH", string(tempPath) + "hdc.err");
     int outFd = open(outPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
     int savedStdout = -1;
     if (outFd >= 0) {
         HDCZ_LOG("cmd() redirecting stdout to %{public}s fd=%{public}d", outPath.c_str(), outFd);
         savedStdout = dup(STDOUT_FILENO);
         dup2(outFd, STDOUT_FILENO);
+    }
+    int errFd = open(errPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    int savedStderr = -1;
+    if (errFd >= 0) {
+        HDCZ_LOG("cmd() redirecting stderr to %{public}s fd=%{public}d", errPath.c_str(), errFd);
+        savedStderr = dup(STDERR_FILENO);
+        dup2(errFd, STDERR_FILENO);
     }
 
     string options, commands;
@@ -67,6 +84,15 @@ int cmd(int argc, const char *argv[], const char *tempPath)
             close(savedStdout);
         }
         close(outFd);
+    }
+    if (errFd >= 0) {
+        fflush(stderr);
+        fsync(errFd);
+        if (savedStderr >= 0) {
+            dup2(savedStderr, STDERR_FILENO);
+            close(savedStderr);
+        }
+        close(errFd);
     }
     Hdc::Base::RemoveLogCache();
     return 0;

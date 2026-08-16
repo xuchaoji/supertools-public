@@ -1,8 +1,9 @@
-﻿#include "napi/native_api.h"
+#include "napi/native_api.h"
 #include "hdc.h"
 #include <atomic>
 #include <thread>
 #include <cstdio>
+#include <cstdlib>
 #include <sstream>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -49,6 +50,8 @@ static const char** vector_to_const_argv(const std::vector<std::string>& vec) {
     return argv;
 }
 
+static std::atomic<uint64_t> g_cmdSeq{0};
+
 static napi_value HdcCmd(napi_env env, napi_callback_info info) {
     HDCZ_LOG("hdcCmd called");
     size_t argc = 3;
@@ -58,6 +61,15 @@ static napi_value HdcCmd(napi_env env, napi_callback_info info) {
     std::string tempDir = napi_to_string(env, args[1]);
     HDCZ_LOG("hdcCmd cmd=%{public}s tempDir=%{public}s", cmdString.c_str(), tempDir.c_str());
     std::vector<std::string> params = parseCommandLine(cmdString);
+
+    // Each command gets its own run directory + output files, so a command that
+    // is cancelled or times out at the ArkTS layer can never race with the next
+    // command over a shared hdc.out file.
+    uint64_t seq = g_cmdSeq.fetch_add(1);
+    std::string runDir = tempDir + "run_" + std::to_string(seq) + "/";
+    mkdir(runDir.c_str(), 0755);
+    std::string outPath = runDir + "hdc.out";
+    std::string errPath = runDir + "hdc.err";
 
     napi_value rn;
     napi_create_string_latin1(env, "hdcCmd", NAPI_AUTO_LENGTH, &rn);
@@ -72,20 +84,27 @@ static napi_value HdcCmd(napi_env env, napi_callback_info info) {
             delete d;
         }, &tsfn);
 
-    std::thread t([](std::vector<std::string> p, std::string tdir, napi_threadsafe_function tsfn) {
+    std::thread t([](std::vector<std::string> p, std::string tdir,
+        std::string oPath, std::string ePath, napi_threadsafe_function tsfn) {
+        setenv("HDC_OUT_PATH", oPath.c_str(), 1);
+        setenv("HDC_ERR_PATH", ePath.c_str(), 1);
         const char** argv = vector_to_const_argv(p);
         int ret = cmd(static_cast<int>(p.size()), argv, tdir.c_str());
         delete[] argv;
+        unsetenv("HDC_OUT_PATH");
+        unsetenv("HDC_ERR_PATH");
         HDCZ_LOG("hdcCmd worker: ret=%{public}d", ret);
         auto* cb = new int(ret);
         napi_call_threadsafe_function(tsfn, cb, napi_tsfn_blocking);
         napi_release_threadsafe_function(tsfn, napi_tsfn_release);
-    }, params, tempDir, tsfn);
+    }, params, tempDir, outPath, errPath, tsfn);
     t.detach();
 
-    napi_value sum;
-    napi_create_double(env, 0, &sum);
-    return sum;
+    // Synchronously return the run directory; ArkTS reads runDir/hdc.out and
+    // runDir/hdc.err when the callback fires.
+    napi_value result;
+    napi_create_string_utf8(env, runDir.c_str(), runDir.size(), &result);
+    return result;
 }
 
 static std::atomic<bool> g_serverRunning{false};
