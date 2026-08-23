@@ -5,12 +5,27 @@
  * 模拟光在材质表面的折射与漫反射，并按系统深/浅色模式提供两套参数，
  * 保证深色模式下不出现浅色玻璃发白发灰、浅色模式下不出现死黑脏边的问题。
  */
+import { LightSense } from './LightSense';
+
 export class ImmersiveStyles {
   // ===================== 卡片（Card） =====================
 
-  /** 卡片毛玻璃基底色：浅色模式泛白产生实体感（社区建议 ≈90% 白，此处保留一定通透度），深色模式压低亮度 */
+  /**
+   * 卡片毛玻璃基底色（按全局光感档位取值）：浅色模式泛白产生实体感，深色模式压低亮度。
+   * 档位越高透明度越低（更实、更精致）；关闭档近乎纯色。
+   */
   static cardBase(isDark: boolean): string {
-    return isDark ? 'rgba(255, 255, 255, 0.09)' : 'rgba(255, 255, 255, 0.7)';
+    const lv = LightSense.getLevel();
+    if (lv <= LightSense.LEVEL_OFF) {
+      return isDark ? 'rgba(28, 28, 32, 0.94)' : 'rgba(255, 255, 255, 0.94)';
+    }
+    if (lv <= LightSense.LEVEL_GENTLE) {
+      return isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.5)';
+    }
+    if (lv <= LightSense.LEVEL_SMOOTH) {
+      return isDark ? 'rgba(255, 255, 255, 0.09)' : 'rgba(255, 255, 255, 0.7)';
+    }
+    return isDark ? 'rgba(255, 255, 255, 0.13)' : 'rgba(255, 255, 255, 0.8)';
   }
 
   /** 卡片表面光感渐变：左上角光源高光 -> 中间通透 -> 右下角微暗角增加立体感 */
@@ -36,9 +51,27 @@ export class ImmersiveStyles {
     return isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.1)';
   }
 
-  /** 卡片背景模糊半径（vp）：官方/社区建议卡片 24~32，小尺寸网格卡片取折中 */
+  /**
+   * 卡片背景模糊半径（vp，按全局光感档位取值）：
+   * 官方/社区建议卡片 24~32，小尺寸网格卡片取折中；关闭档为 0。
+   */
   static cardBlurRadius(): number {
-    return 20;
+    const lv = LightSense.getLevel();
+    if (lv <= LightSense.LEVEL_OFF) {
+      return 0;
+    }
+    if (lv <= LightSense.LEVEL_GENTLE) {
+      return 8;
+    }
+    if (lv <= LightSense.LEVEL_SMOOTH) {
+      return 20;
+    }
+    return 32;
+  }
+
+  /** 卡片毛玻璃档位（backgroundBlurStyle 用，按全局光感档位取值） */
+  static cardBlurStyle(): BlurStyle {
+    return LightSense.cardBlurStyle(LightSense.getLevel());
   }
 
   /** 卡片圆角 */

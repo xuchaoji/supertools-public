@@ -1,5 +1,6 @@
 import { mediaquery } from '@kit.ArkUI';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
+import { LightSense } from '../utils/LightSense';
 
 @ComponentV2
 export struct SettingGroup {
@@ -33,9 +34,13 @@ export struct SettingGroup {
       ListItemGroup() {
         this.content()
       }
-      // 沉浸光感：毛玻璃基底
+      // 沉浸光感：毛玻璃基底（档位驱动：精致档换官方 systemMaterial，其余为 backgroundBlurStyle）
       .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
-      .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
+      .backgroundBlurStyle(
+        LightSense.immersiveMaterial(LightSense.getLevel()) ? BlurStyle.NONE : ImmersiveStyles.cardBlurStyle())
+      .systemMaterial(LightSense.immersiveMaterial(LightSense.getLevel()))
+      // 点光源光效（官方视觉特效，标准/精致档生效）
+      .visualEffect(LightSense.lightVisualEffect())
       // 表面光感渐变（左上光源 -> 右下微暗角）
       .linearGradient({
         angle: 135,

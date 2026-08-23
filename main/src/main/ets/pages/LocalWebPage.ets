@@ -563,9 +563,9 @@ export struct LocalWebPage {
 
         Toggle({ type: ToggleType.Switch, isOn: this.viewModel.isServerRunning }).onChange(() => this.toggleServer())
       }
-      // 毛玻璃状态卡片：透明化让壁纸透出，避免状态栏下方出现整块白条
+      // 毛玻璃状态卡片：透明化让壁纸透出，避免状态栏下方出现整块白条（模糊档位跟随全局光感）
       .padding(16)
-      .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
+      .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle())
       .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
       .linearGradient({ angle: 135, colors: ImmersiveStyles.cardSurfaceColors(this.isDark) })
       .borderRadius(12)
@@ -656,9 +656,9 @@ export struct LocalWebPage {
               .height(40)
               .bindMenu(this.getMenuItems(item))
           }
-          // 毛玻璃卡片：透明化让壁纸透出，与顶部状态卡片风格一致
+          // 毛玻璃卡片：透明化让壁纸透出，与顶部状态卡片风格一致（模糊档位跟随全局光感）
           .padding(12).width('100%')
-          .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
+          .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle())
           .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
           .borderRadius(12)
           .clip(true)

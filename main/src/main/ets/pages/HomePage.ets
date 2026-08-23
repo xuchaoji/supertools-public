@@ -12,6 +12,7 @@ import { mediaquery, display } from '@kit.ArkUI';
 import { image } from '@kit.ImageKit';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 import { WallpaperUtil } from '../utils/WallpaperUtil';
+import { LightSense } from '../utils/LightSense';
 import { PhotoHelper } from '@pura/picker_utils';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { common } from '@kit.AbilityKit';
@@ -54,6 +55,8 @@ export struct HomePage {
   @Local wallpaperPath: string = '';
   /** 壁纸模糊度（0~100，0=不模糊），通过 AppStorage 与 Index 根级壁纸层同步 */
   @Local wallpaperBlur: number = 0;
+  /** 全局光感档位（0=关闭 1=柔和 2=标准 3=精致），驱动 Tab 材质/卡片毛玻璃/点光源 */
+  @Local lightSense: number = LightSense.LEVEL_EXQUISITE;
   // 官方 HDS 沉浸光感 Tab（HdsTabs + systemMaterialEffect）
   private hdsTabsController: HdsTabsController = new HdsTabsController();
   private hdsTabsModifier: HdsTabsModifier = new HdsTabsModifier();
@@ -184,37 +187,42 @@ export struct HomePage {
     // 恢复已设置的壁纸
     this.wallpaperPath = WallpaperUtil.getPath();
     this.wallpaperBlur = WallpaperUtil.getBlur();
+    this.lightSense = LightSense.getLevel();
     this.loadWallpaperPm();
     // 配置官方 HDS 沉浸光感悬浮 Tab 栏
     if (this.supportImmersiveTabs) {
       try {
-        this.hdsTabsModifier
-          .vertical(false)
-          .barPosition(BarPosition.End)
-          .barHeight(56)
-          .barFloatingStyle({
-            // 不跟随手持方向：跟随会把悬浮栏向惯用手一侧锚定，导致胶囊偏右/伸出屏幕
-            adaptToHandedness: false,
-            // 悬浮 Tab 栏宽度 = 屏幕 75%（436vp × 75% ≈ 327vp，用数值避免百分比解析错位）
-            barWidth: {
-              smallWidth: 327,
-              mediumWidth: 327,
-              largeWidth: 327
-            },
-            // 悬浮栏距底部间距（vp 单位；系统手势条约 33vp，这里留 40vp 避开）
-            barBottomMargin: 40,
-            systemMaterialEffect: {
-              materialType: hdsMaterial.MaterialType.IMMERSIVE,
-              // 固定材质级别保证跨设备一致：ADAPTIVE 会跟随系统策略/背景自适应，
-              // 不同设备解析出的强度不同；这里固定为 EXQUISITE（精致，更强光感）
-              materialLevel: hdsMaterial.MaterialLevel.EXQUISITE,
-            },
-          });
+        this.configureHdsTabs();
       } catch (e) {
         hilog.info(0x0000, TAG, 'init HdsTabsModifier failed: ' + JSON.stringify(e));
         this.supportImmersiveTabs = false;
       }
     }
+  }
+
+  /** 配置 HDS 悬浮 Tab 栏（材质类型/级别按全局光感档位驱动） */
+  private configureHdsTabs(): void {
+    this.hdsTabsModifier
+      .vertical(false)
+      .barPosition(BarPosition.End)
+      .barHeight(56)
+      .barFloatingStyle({
+        // 不跟随手持方向：跟随会把悬浮栏向惯用手一侧锚定，导致胶囊偏右/伸出屏幕
+        adaptToHandedness: false,
+        // 悬浮 Tab 栏宽度 = 屏幕 75%（436vp × 75% ≈ 327vp，用数值避免百分比解析错位）
+        barWidth: {
+          smallWidth: 327,
+          mediumWidth: 327,
+          largeWidth: 327
+        },
+        // 悬浮栏距底部间距（vp 单位；系统手势条约 33vp，这里留 40vp 避开）
+        barBottomMargin: 40,
+        systemMaterialEffect: {
+          // 材质类型/级别按全局光感档位：关闭=无材质，柔和=GENTLE，标准=SMOOTH，精致=EXQUISITE
+          materialType: LightSense.tabMaterialType(this.lightSense),
+          materialLevel: LightSense.tabMaterialLevel(this.lightSense),
+        },
+      });
   }
 
   aboutToDisappear(): void {
@@ -537,6 +545,21 @@ export struct HomePage {
       console.error(`[WallpaperUtil] put blur failed: ${JSON.stringify(e)}`);
     }
     AppStorage.setOrCreate<number>('WallpaperBlur', v);
+  }
+
+  /** 调整全局光感档位：本地状态 + 持久化 + 重新配置 Tab 材质（卡片毛玻璃按档位自动跟随） */
+  private updateLightSense(value: number): void {
+    const v = Math.min(Math.max(Math.round(value), 0), 3);
+    this.lightSense = v;
+    LightSense.setLevel(v);
+    // Tab 栏材质类型/级别随档位变化，重新应用 modifier
+    if (this.supportImmersiveTabs) {
+      try {
+        this.configureHdsTabs();
+      } catch (e) {
+        hilog.info(0x0000, TAG, 'update LightSense HdsTabs failed: ' + JSON.stringify(e));
+      }
+    }
   }
 
   /** 内容底部呼吸间距（vp） */
@@ -951,6 +974,34 @@ export struct HomePage {
             .padding({ left: '16vp', right: '16vp' })
           }
           .visibility(this.wallpaperPath !== '' ? Visibility.Visible : Visibility.None)
+          ListItem() {
+            Row({ space: 12 }) {
+              Text('光感')
+                .fontColor($r('sys.color.font_primary'))
+                .fontSize('16vp')
+                .fontWeight(FontWeight.Medium)
+                .layoutWeight(1)
+
+              Text(LightSense.levelName(this.lightSense))
+                .fontSize('13vp')
+                .fontColor($r('sys.color.font_secondary'))
+
+              Slider({
+                value: this.lightSense,
+                min: 0,
+                max: 3,
+                step: 1,
+                style: SliderStyle.OutSet
+              })
+                .width('160vp')
+                .onChange((value: number, mode: SliderChangeMode) => {
+                  this.updateLightSense(value);
+                })
+            }
+            .width('100%')
+            .height('64vp')
+            .padding({ left: '16vp', right: '16vp' })
+          }
         }
         if (this.supportImmersiveTabs) {
           Row()
