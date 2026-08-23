@@ -205,7 +205,9 @@ export struct HomePage {
             barBottomMargin: 40,
             systemMaterialEffect: {
               materialType: hdsMaterial.MaterialType.IMMERSIVE,
-              materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE,
+              // 固定材质级别保证跨设备一致：ADAPTIVE 会跟随系统策略/背景自适应，
+              // 不同设备解析出的强度不同；这里固定为 EXQUISITE（精致，更强光感）
+              materialLevel: hdsMaterial.MaterialLevel.EXQUISITE,
             },
           });
       } catch (e) {
