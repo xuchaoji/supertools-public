@@ -7,6 +7,7 @@ import { hidebug } from '@kit.PerformanceAnalysisKit';
 import { common } from '@kit.AbilityKit';
 import statfs from '@ohos.file.statvfs';
 import { connection } from '@kit.NetworkKit';
+import { WallpaperHost } from '../components/WallpaperHost';
 
 const TAG: string = 'DeviceInfoPage';
 
@@ -192,11 +193,14 @@ export struct DeviceInfoPage {
   }
 
   build() {
-    Column() {
-      Scroll() {
-        Column({ space: '4vp' }) {
-          this.StaticSection('设备信息', this.deviceItems)
-          this.StaticSection('屏幕信息', this.displayItems)
+    // @Entry 根节点必须是容器组件，外层包 Stack，内层 WallpaperHost 提供全局壁纸背景
+    Stack() {
+      WallpaperHost() {
+        Column() {
+          Scroll() {
+            Column({ space: '4vp' }) {
+              this.StaticSection('设备信息', this.deviceItems)
+              this.StaticSection('屏幕信息', this.displayItems)
 
           // 内存信息（实时）- 直接读取 @Trace 属性
           Column() {
@@ -303,7 +307,11 @@ export struct DeviceInfoPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('sys.color.background_primary'))
+    .backgroundColor(Color.Transparent)
+      }
+    }
+    .width('100%')
+    .height('100%')
   }
 
   @Builder

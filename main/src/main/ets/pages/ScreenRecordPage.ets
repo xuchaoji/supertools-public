@@ -6,6 +6,7 @@ import { RecordModel } from "../model/RecordModel";
 import { MyAVScreenCapture } from "../utils/MyAVScreenCapture";
 import { RecordViewModel } from "../viewmodel/RecordViewModel";
 import { RecordCard } from "../widgets/RecordCard";
+import { WallpaperHost } from "../components/WallpaperHost";
 import { abilityAccessCtrl, Permissions } from "@kit.AbilityKit";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { audio } from "@kit.AudioKit";
@@ -32,9 +33,11 @@ export struct ScreenRecordPage {
   }
 
   build() {
-    RelativeContainer() {
-      // 视频列表区域
+    // 全局壁纸宿主：录屏页也继承主页壁纸背景（根背景透明让壁纸透出）
+    WallpaperHost() {
       RelativeContainer() {
+        // 视频列表区域
+        RelativeContainer() {
         if (this.viewModel.recordings.length === 0) {
           this.EmptyView()
         } else {
@@ -81,9 +84,10 @@ export struct ScreenRecordPage {
       .height('20%')
       .alignRules({ bottom: { anchor: '__container__', align: VerticalAlign.Bottom } })
     }
-    .backgroundColor($r('sys.color.comp_background_gray'))
+    .backgroundColor(Color.Transparent)
     .width('100%')
     .height('100%')
+    }
   }
 
   @Builder

@@ -3,6 +3,7 @@ import promptAction from '@ohos.promptAction';
 import util from '@ohos.util';
 import { ToastUtil } from '@pura/harmony-utils';
 import { PageNames } from '../constant/PageNames';
+import { WallpaperHost } from '../components/WallpaperHost';
 
 const TAG: string = 'StringConverter'
 
@@ -66,15 +67,17 @@ export struct StringConverter {
   }
 
   build() {
-    Column({ space: 20 }) {
-      // 输入区域
-      TextArea({ text: this.inputText, placeholder: '输入要转换的字符串' })
-        .height(150)
-        .width('95%')
-        .fontSize(16)
-        .onChange((value: string) => {
-          this.inputText = value;
-        })
+    // 全局壁纸宿主：字符串转换页继承主页壁纸背景
+    WallpaperHost() {
+      Column({ space: 20 }) {
+        // 输入区域
+        TextArea({ text: this.inputText, placeholder: '输入要转换的字符串' })
+          .height(150)
+          .width('95%')
+          .fontSize(16)
+          .onChange((value: string) => {
+            this.inputText = value;
+          })
 
       // 输出区域
       TextArea({ text: this.outputText, placeholder: '转换结果' })
@@ -120,6 +123,7 @@ export struct StringConverter {
     .width('100%')
     .height('100%')
     .padding(20)
-    .backgroundColor($r('sys.color.comp_background_gray'))
+    .backgroundColor(Color.Transparent)
+    }
   }
 }

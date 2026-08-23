@@ -6,6 +6,7 @@ import { PageNames } from '../constant/PageNames';
 import { CalcMsgData } from '../model/CalcMsgData';
 import { StatusIndicator } from '../widgets/StatusIndicator';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
+import { WallpaperHost } from '../components/WallpaperHost';
 
 const TAG: string = 'CalcPageTag';
 
@@ -153,12 +154,15 @@ export struct CalcPage {
   }
 
   build() {
-    Column() {
-      // 标题
-      Text('设备高负载模拟器')
-        .fontSize(24)
-        .fontWeight(FontWeight.Bold)
-        .margin({ top: 20, bottom: 10 });
+    // @Entry 根节点必须是容器组件，外层包 Stack，内层 WallpaperHost 提供全局壁纸背景
+    Stack() {
+      WallpaperHost() {
+        Column() {
+          // 标题
+          Text('设备高负载模拟器')
+            .fontSize(24)
+            .fontWeight(FontWeight.Bold)
+            .margin({ top: 20, bottom: 10 });
 
       // 状态指示器
       Row() {
@@ -209,7 +213,11 @@ export struct CalcPage {
     .width('100%')
     .height('100%')
     .padding(16)
-    .backgroundColor($r('sys.color.background_primary'));
+    .backgroundColor(Color.Transparent);
+      }
+    }
+    .width('100%')
+    .height('100%')
   }
 }
 

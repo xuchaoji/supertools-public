@@ -12,6 +12,9 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { BackgroundServiceManager } from '../utils/BackgroundServiceManager';
 import { TargetConstants } from 'main/ets/TargetConstants';
 import { AppUtil, PreferencesUtil } from '@pura/harmony-utils';
+import { WallpaperHost } from '../components/WallpaperHost';
+import { mediaquery } from '@kit.ArkUI';
+import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 
 // --- 类型定义 ---
 interface MenuElement {
@@ -68,8 +71,20 @@ export struct LocalWebPage {
   private renameDialogController: CustomDialogController | null = null;
   @Local dialogInputName: string = "";
   private renameTargetItem: FileItem | null = null;
+  /** 沉浸光感：跟随系统深/浅色模式（顶部状态卡片毛玻璃用） */
+  @Local isDark: boolean = false;
+  private themeMq: mediaquery.MediaQueryListener | null = null;
 
   aboutToAppear(): void {
+    try {
+      this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(display-mode: dark)');
+      this.isDark = this.themeMq.matches;
+      this.themeMq.on('change', (event: mediaquery.MediaQueryResult) => {
+        this.isDark = event.matches;
+      });
+    } catch (e) {
+      this.isDark = false;
+    }
     BackgroundTaskUtil.init(this.context);
     FloatWindowUtil.init(this.context);
     this.viewModel.rootDir = this.context.filesDir + '/wwwroot';
@@ -90,6 +105,11 @@ export struct LocalWebPage {
       this.viewModel.serverIp = server.getIpAddress();
     }
     this.refreshFileList();
+  }
+
+  aboutToDisappear(): void {
+    this.themeMq?.off('change');
+    this.themeMq = null;
   }
 
   // --- 逻辑部分 ---
@@ -542,7 +562,15 @@ export struct LocalWebPage {
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
 
         Toggle({ type: ToggleType.Switch, isOn: this.viewModel.isServerRunning }).onChange(() => this.toggleServer())
-      }.padding(16).backgroundColor($r('sys.color.ohos_id_color_card_bg')).borderRadius(12).margin(16)
+      }
+      // 毛玻璃状态卡片：透明化让壁纸透出，避免状态栏下方出现整块白条
+      .padding(16)
+      .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
+      .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
+      .linearGradient({ angle: 135, colors: ImmersiveStyles.cardSurfaceColors(this.isDark) })
+      .borderRadius(12)
+      .clip(true)
+      .margin(16)
     }
   }
 
@@ -628,8 +656,12 @@ export struct LocalWebPage {
               .height(40)
               .bindMenu(this.getMenuItems(item))
           }
+          // 毛玻璃卡片：透明化让壁纸透出，与顶部状态卡片风格一致
           .padding(12).width('100%')
-          .backgroundColor($r('sys.color.ohos_id_color_background'))
+          .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
+          .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
+          .borderRadius(12)
+          .clip(true)
         }
       })
       if (this.viewModel.fileList.length === 0) {
@@ -699,11 +731,13 @@ export struct LocalWebPage {
 
   build() {
     NavDestination() {
-      Stack() {
-        Column() {
-          this.HeaderSection()
-          Divider().color($r('sys.color.ohos_id_color_list_separator'))
-          this.OperationSection()
+      // 全局壁纸宿主：本地 web 服务页继承主页壁纸背景
+      WallpaperHost() {
+        Stack() {
+          Column() {
+            this.HeaderSection()
+            Divider().color($r('sys.color.ohos_id_color_list_separator'))
+            this.OperationSection()
 
           if (this.viewModel.clipboard) {
             Row() {
@@ -741,7 +775,7 @@ export struct LocalWebPage {
           this.FileListSection()
         }
         .height('100%').width('100%')
-        .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
+        .backgroundColor(Color.Transparent)
 
         if (this.viewModel.isEditing) {
           this.EditorLayer()
@@ -749,10 +783,13 @@ export struct LocalWebPage {
         if (this.viewModel.isPreviewing) {
           this.PreviewLayer()
         }
+        }
       }
     }
     .title("超熵实验室 Web")
-    .backgroundColor($r('sys.color.ohos_id_color_sub_background'))
+    // 隐藏标题栏：否则标题栏白底会在状态栏下方形成一条白条，挡住壁纸
+    .hideTitleBar(true)
+    .backgroundColor(Color.Transparent)
     .onReady((context: NavDestinationContext) => {
       this.newFolderDialogController = new CustomDialogController({
         builder: () => {

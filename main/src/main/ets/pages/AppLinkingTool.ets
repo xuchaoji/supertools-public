@@ -10,6 +10,7 @@ import { camera } from '@kit.CameraKit';
 import { display } from '@kit.ArkUI';
 import { PreferencesUtil } from '@pura/harmony-utils';
 import { SpKeys } from '../constant/SpKeys';
+import { WallpaperHost } from '../components/WallpaperHost';
 
 interface ScanViewControl {
   surfaceId: string;
@@ -253,7 +254,10 @@ export struct AppLinkingTool {
     if (this.isScanning) {
       this.ScanView();
     } else {
-      this.MainView();
+      // 全局壁纸宿主：解析页继承主页壁纸背景（扫码页保持相机全屏不套用）
+      WallpaperHost() {
+        this.MainView();
+      }
     }
   }
 
@@ -447,7 +451,7 @@ export struct AppLinkingTool {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor($r('sys.color.background_primary'))
+    .backgroundColor(Color.Transparent)
   }
 
   @Builder

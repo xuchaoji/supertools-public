@@ -9,6 +9,7 @@ import { pasteboard } from '@kit.BasicServicesKit';
 import { promptAction } from '@kit.ArkUI';
 import fs from '@ohos.file.fs';
 import { picker } from '@kit.CoreFileKit';
+import { WallpaperHost } from '../components/WallpaperHost';
 
 type EntryType = "input" | "output" | "error" | "system" | "meta";
 
@@ -870,32 +871,39 @@ export struct HdcDebugPage {
   }
 
   build() {
-    Column() {
-      this.headerRow()
-      this.statusLine()
+    // @Entry 根节点必须是容器组件，外层包 Stack，内层 WallpaperHost 提供全局壁纸背景
+    Stack() {
+      WallpaperHost() {
+        Column() {
+          this.headerRow()
+          this.statusLine()
 
-      Column() { this.terminalColumns() }
-        .layoutWeight(1).width("100%").padding({ left: 12, right: 12 })
-        .backgroundColor("sys.color.background_primary").borderRadius(12)
-        .border({ width: 1, color: "sys.color.comp_background_emphasize" })
+          Column() { this.terminalColumns() }
+            .layoutWeight(1).width("100%").padding({ left: 12, right: 12 })
+            .backgroundColor("sys.color.background_primary").borderRadius(12)
+            .border({ width: 1, color: "sys.color.comp_background_emphasize" })
 
-      Column() {
-        this.connectBar()
-        this.logToolsRow()
-        this.quickPanel()
-        this.historyRow()
-        this.inputArea()
-      }.width("100%").padding({ left: 12, right: 12, bottom: 12 })
+          Column() {
+            this.connectBar()
+            this.logToolsRow()
+            this.quickPanel()
+            this.historyRow()
+            this.inputArea()
+          }.width("100%").padding({ left: 12, right: 12, bottom: 12 })
+        }
+        .width("100%").height("100%")
+        .backgroundColor(Color.Transparent)
+        .padding({ top: AppUtil.getStatusBarHeight() + "px" as string })
+        // 已抓取日志管理面板
+        .bindSheet(this.showLogManager, this.logManagerSheet(), {
+          height: 520,
+          dragBar: true,
+          backgroundColor: $r('sys.color.background_secondary'),
+          showClose: false
+        })
+      }
     }
-    .width("100%").height("100%")
-    .backgroundColor("sys.color.background_primary")
-    .padding({ top: AppUtil.getStatusBarHeight() + "px" as string })
-    // 已抓取日志管理面板
-    .bindSheet(this.showLogManager, this.logManagerSheet(), {
-      height: 520,
-      dragBar: true,
-      backgroundColor: $r('sys.color.background_secondary'),
-      showClose: false
-    })
+    .width('100%')
+    .height('100%')
   }
 }
