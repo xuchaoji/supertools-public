@@ -8,4 +8,5 @@ export class SpKeys {
   public static readonly AUTO_START_ENABLED: string = 'auto_start_enabled';
   public static readonly TOOL_ORDER: string = 'tool_order';
   public static readonly HDC_DEBUG_LOG: string = 'hdc_debug_log';
+  public static readonly WALLPAPER_PATH: string = 'wallpaper_path';
 }

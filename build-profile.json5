@@ -18,13 +18,13 @@
         "name": "dev",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
+          "certpath": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001BECE3FB5F514EF96906371F9E895259059A09E017EFDE00D3DEEEF8BB91B4467EB8CE906EB50E76",
-          "profile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
+          "keyPassword": "0000001A491D2E94E5C4FE64964530EB3C133D89515EB34BBF3EADF5AA33105EF5534D0319978305531D",
+          "profile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
-          "storePassword": "0000001B7E989ECF6104E7B32C5ACE06B7808A59E141D54FA3A7D9D53572CF89BE989CFB0A20F927684E33"
+          "storeFile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
+          "storePassword": "0000001A534E56318E1F3A2EAA93D0CBE127033AF20E2A0C8E18212A61409B19D3ABBA0AF807F25737F6"
         }
       }
     ],

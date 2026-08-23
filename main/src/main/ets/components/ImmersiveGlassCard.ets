@@ -1,33 +1,64 @@
+import { mediaquery } from '@kit.ArkUI';
+
 @Component
 export struct ImmersiveGlassCard {
   // --- 暴露给外部的属性 ---
   @Prop zHeight: number = 2;   // Z轴高度/厚度，推荐取值 1 ~ 10
   @Prop zRadius: number = 16;  // 边缘圆角半径
-  @Prop theme: 'light' | 'dark' = 'light'; // 背景环境亮度主题，默认浅色
+  @Prop theme: 'light' | 'dark' = 'light'; // 背景环境亮度主题（仅 followSystem=false 时生效）
+  @Prop followSystem: boolean = true;      // 沉浸光感：默认跟随系统深/浅色模式
 
   // 允许外部传入内部 UI 内容
   @BuilderParam content: () => void;
+
+  // --- 沉浸光感：系统深/浅色模式状态 ---
+  @State isDark: boolean = false;
+  private themeMq: mediaquery.MediaQueryListener | null = null;
+
+  aboutToAppear(): void {
+    if (this.followSystem) {
+      try {
+        this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(display-mode: dark)');
+        this.isDark = this.themeMq.matches;
+        this.themeMq.on('change', (event: mediaquery.MediaQueryResult) => {
+          this.isDark = event.matches;
+        });
+      } catch (e) {
+        this.isDark = false;
+      }
+    }
+  }
+
+  aboutToDisappear(): void {
+    this.themeMq?.off('change');
+    this.themeMq = null;
+  }
+
+  /** 当前生效的主题 */
+  private getEffectiveTheme(): 'light' | 'dark' {
+    return this.followSystem ? (this.isDark ? 'dark' : 'light') : this.theme;
+  }
 
   // --- 针对亮暗背景动态计算光学参数 ---
 
   // 1. 毛玻璃基础底色 (浅色需泛白以产生实体感)
   private getBaseColor(): string {
-    return this.theme === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.05)';
+    return this.getEffectiveTheme() === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.05)';
   }
 
   // 2. 边缘截面颜色 (修正纯白背景下死黑脏边问题，使用极淡灰/白)
   private getEdgeColor(): string {
-    return this.theme === 'light' ? 'rgba(150, 150, 150, 0.1)' : 'rgba(255, 255, 255, 0.35)';
+    return this.getEffectiveTheme() === 'light' ? 'rgba(150, 150, 150, 0.1)' : 'rgba(255, 255, 255, 0.35)';
   }
 
   // 3. 物理阴影颜色 (浅色背景下阴影极度柔和)
   private getShadowColor(): string {
-    return this.theme === 'light' ? 'rgba(0, 0, 0, 0.02)' : 'rgba(0, 0, 0, 0.2)';
+    return this.getEffectiveTheme() === 'light' ? 'rgba(0, 0, 0, 0.02)' : 'rgba(0, 0, 0, 0.2)';
   }
 
   // 4. 表面光感渐变
   private getSurfaceColors(): Array<[ResourceColor, number]> {
-    if (this.theme === 'light') {
+    if (this.getEffectiveTheme() === 'light') {
       return [
         ['rgba(255, 255, 255, 0.6)', 0.0],  // 左上角加强泛白
         ['rgba(255, 255, 255, 0.0)', 0.4],  // 中间通透

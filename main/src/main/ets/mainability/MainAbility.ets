@@ -142,18 +142,31 @@ export default class MainAbility extends UIAbility {
     // Main window is created, set main page for this ability
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
 
-    windowStage.loadContent('pages/Index', (err) => {
-      if (err.code) {
-        hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
-        return;
-      }
-      hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
-    });
+    const loadPage = (): void => {
+      windowStage.loadContent('pages/Index', (err) => {
+        if (err.code) {
+          hilog.error(DOMAIN, 'testTag', 'Failed to load the content. Cause: %{public}s', JSON.stringify(err));
+          return;
+        }
+        hilog.info(DOMAIN, 'testTag', 'Succeeded in loading the content.');
+      });
+    };
 
-    windowStage.getMainWindow((err: BusinessError, data) => {
-      let windowClass = data;
-      windowClass.setWindowLayoutFullScreen(true);
-    })
+    // 必须先让全屏布局真正生效，再加载页面：
+    // setWindowLayoutFullScreen 是异步的，若页面在标志生效前完成首次布局，
+    // expandSafeArea 等安全区延伸在冷启动时不会覆盖状态栏（状态栏露出灰白背景）。
+    // 因此把 loadContent 放到全屏 Promise 成功回调中执行。
+    try {
+      windowStage.getMainWindowSync().setWindowLayoutFullScreen(true).then(() => {
+        loadPage();
+      }).catch((e: Object) => {
+        hilog.error(DOMAIN, 'testTag', 'setWindowLayoutFullScreen failed: %{public}s', JSON.stringify(e));
+        loadPage();
+      });
+    } catch (e) {
+      hilog.error(DOMAIN, 'testTag', 'getMainWindowSync failed: %{public}s', JSON.stringify(e));
+      loadPage();
+    }
   }
 
   onWindowStageDestroy(): void {
