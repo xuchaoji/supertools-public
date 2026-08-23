@@ -9,4 +9,6 @@ export class SpKeys {
   public static readonly TOOL_ORDER: string = 'tool_order';
   public static readonly HDC_DEBUG_LOG: string = 'hdc_debug_log';
   public static readonly WALLPAPER_PATH: string = 'wallpaper_path';
+  /** 壁纸模糊度（0~100，0=不模糊） */
+  public static readonly WALLPAPER_BLUR: string = 'wallpaper_blur';
 }

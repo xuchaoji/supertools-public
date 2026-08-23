@@ -14,6 +14,8 @@ struct Index {
   // 壁纸解码为 PixelMap 后在根级全屏渲染，天然覆盖状态栏区域，
   // 冷启动也稳定生效（不依赖 Image 的沙箱路径解析，也不依赖安全区延伸）。
   @StorageProp('WallpaperPath') @Watch('reloadWallpaper') wallpaperPath: string = '';
+  // 壁纸模糊度（0~100）：与 HomePage 设置页通过 AppStorage 同步，根级壁纸层应用相同模糊
+  @StorageProp('WallpaperBlur') wallpaperBlur: number = 0;
   @State wallpaperPm: image.PixelMap | undefined = undefined;
 
   modifier: MyNavModifier = new MyNavModifier();
@@ -23,6 +25,7 @@ struct Index {
     // 注意不能用 AppStorage.get() === undefined 判断——@StorageProp 创建时
     // 已把该键注册为默认值 ''，undefined 判断永远不成立，导致壁纸路径丢失
     AppStorage.setOrCreate<string>('WallpaperPath', WallpaperUtil.getPath());
+    AppStorage.setOrCreate<number>('WallpaperBlur', WallpaperUtil.getBlur());
     this.reloadWallpaper();
   }
 
@@ -52,12 +55,13 @@ struct Index {
 
   build() {
     Stack() {
-      // 壁纸层：全屏铺满（含状态栏区域）
+      // 壁纸层：全屏铺满（含状态栏区域），模糊半径与 HomePage 内容层一致
       if (this.wallpaperPm) {
         Image(this.wallpaperPm)
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
+          .blur(WallpaperUtil.blurRadius(this.wallpaperBlur))
       }
 
       // 内容层：从状态栏下方开始；有壁纸时透明让壁纸透出，无壁纸时保持原灰底

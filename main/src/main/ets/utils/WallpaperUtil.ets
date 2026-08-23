@@ -20,6 +20,24 @@ export class WallpaperUtil {
     }
   }
 
+  /** 壁纸模糊度（0~100，0=不模糊），持久化读取 */
+  static getBlur(): number {
+    try {
+      return PreferencesUtil.getNumberSync(SpKeys.WALLPAPER_BLUR, 0);
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  /**
+   * 模糊度等级 -> 实际模糊半径（vp）。
+   * 等级 0~100 映射到 0~30vp：30vp 为重度模糊（近乎纯色毛玻璃）。
+   * 两层壁纸（Index 根级 + HomePage 内容级）必须用同一映射，才能保持无缝衔接。
+   */
+  static blurRadius(level: number): number {
+    return level * 0.3;
+  }
+
   /**
    * 将相册选中的图片复制到应用沙箱并持久化路径。
    *

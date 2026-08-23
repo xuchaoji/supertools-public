@@ -52,6 +52,8 @@ export struct HomePage {
   private themeMq: mediaquery.MediaQueryListener | null = null;
   // 主页壁纸（沉浸光感背景），空字符串表示未设置
   @Local wallpaperPath: string = '';
+  /** 壁纸模糊度（0~100，0=不模糊），通过 AppStorage 与 Index 根级壁纸层同步 */
+  @Local wallpaperBlur: number = 0;
   // 官方 HDS 沉浸光感 Tab（HdsTabs + systemMaterialEffect）
   private hdsTabsController: HdsTabsController = new HdsTabsController();
   private hdsTabsModifier: HdsTabsModifier = new HdsTabsModifier();
@@ -181,6 +183,7 @@ export struct HomePage {
     this.initThemeListener();
     // 恢复已设置的壁纸
     this.wallpaperPath = WallpaperUtil.getPath();
+    this.wallpaperBlur = WallpaperUtil.getBlur();
     this.loadWallpaperPm();
     // 配置官方 HDS 沉浸光感悬浮 Tab 栏
     if (this.supportImmersiveTabs) {
@@ -520,6 +523,18 @@ export struct HomePage {
     AppStorage.setOrCreate<string>('WallpaperPath', '');
     this.wallpaperPm = undefined;
     promptAction.showToast({ message: '已恢复默认背景', duration: 1500 });
+  }
+
+  /** 调整壁纸模糊度：本地状态 + 持久化 + 同步 Index 根级壁纸层 */
+  private updateWallpaperBlur(value: number): void {
+    const v = Math.min(Math.max(Math.round(value), 0), 100);
+    this.wallpaperBlur = v;
+    try {
+      PreferencesUtil.putSync(SpKeys.WALLPAPER_BLUR, v);
+    } catch (e) {
+      console.error(`[WallpaperUtil] put blur failed: ${JSON.stringify(e)}`);
+    }
+    AppStorage.setOrCreate<number>('WallpaperBlur', v);
   }
 
   /** 内容底部呼吸间距（vp） */
@@ -880,12 +895,13 @@ export struct HomePage {
 
               if (this.wallpaperPath !== '') {
                 // 直接用 PixelMap 做缩略图：Image 直接加载沙箱路径（含 file:// 前缀）在本环境不可靠，
-                // 与壁纸背景共用已解码的 wallpaperPm，避免空白缩略图
+                // 与壁纸背景共用已解码的 wallpaperPm，避免空白缩略图；模糊效果与主壁纸一致
                 Image(this.wallpaperPm)
                   .width('44vp')
                   .height('44vp')
                   .borderRadius('8vp')
                   .objectFit(ImageFit.Cover)
+                  .blur(WallpaperUtil.blurRadius(this.wallpaperBlur))
                   .margin({ right: '8vp' })
 
                 Button('恢复默认')
@@ -904,9 +920,36 @@ export struct HomePage {
             .justifyContent(FlexAlign.SpaceBetween)
             .padding({ left: '16vp', right: '16vp' })
           }
-        }
+          ListItem() {
+            Row({ space: 12 }) {
+              Text('模糊度')
+                .fontColor($r('sys.color.font_primary'))
+                .fontSize('16vp')
+                .fontWeight(FontWeight.Medium)
+                .layoutWeight(1)
 
-        // 悬浮 Tab 栏避让 spacer：让最后一组内容可滚动到悬浮栏上方
+              Text(this.wallpaperBlur <= 0 ? '无' : `${Math.round(this.wallpaperBlur)}%`)
+                .fontSize('13vp')
+                .fontColor($r('sys.color.font_secondary'))
+
+              Slider({
+                value: this.wallpaperBlur,
+                min: 0,
+                max: 100,
+                step: 5,
+                style: SliderStyle.OutSet
+              })
+                .width('160vp')
+                .onChange((value: number, mode: SliderChangeMode) => {
+                  this.updateWallpaperBlur(value);
+                })
+            }
+            .width('100%')
+            .height('64vp')
+            .padding({ left: '16vp', right: '16vp' })
+          }
+          .visibility(this.wallpaperPath !== '' ? Visibility.Visible : Visibility.None)
+        }
         if (this.supportImmersiveTabs) {
           Row()
             .height(140)
@@ -1013,13 +1056,15 @@ export struct HomePage {
   build() {
     Stack() {
       // 内容区壁纸：盖住 NavDestination 的白底（Index 根级壁纸只负责状态栏区域）。
-      // 以全屏尺寸 + 状态栏偏移对齐根级壁纸，保证两层渲染同一画面、无缝衔接
+      // 以全屏尺寸 + 状态栏偏移对齐根级壁纸，保证两层渲染同一画面、无缝衔接；
+      // 模糊半径与 Index 根级一致（同一映射），避免模糊后的边缘在状态栏边界出现差异
       if (this.wallpaperPm) {
         Image(this.wallpaperPm)
           .width('100%')
           .height(`${this.wallpaperLayerH}px`)
           .position({ y: `-${this.wallpaperLayerY}px` })
           .objectFit(ImageFit.Cover)
+          .blur(WallpaperUtil.blurRadius(this.wallpaperBlur))
       }
       // 官方 HDS 沉浸光感 Tab（系统 6.1.0+），否则降级为手绘悬浮胶囊
       if (this.supportImmersiveTabs) {
