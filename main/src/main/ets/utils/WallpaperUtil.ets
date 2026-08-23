@@ -203,9 +203,13 @@ export class WallpaperUtil {
         fileIo.OpenMode.CREATE | fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.TRUNC);
       fileIo.writeSync(file.fd, data);
       fileIo.closeSync(file);
+      // 持久化路径：与 apply() 一致，否则确认后壁纸无法生效、重启后丢失
+      PreferencesUtil.putSync(SpKeys.WALLPAPER_PATH, destPath);
       return destPath;
     } catch (e) {
       console.error(`[WallpaperUtil] cropAndSave failed, fallback to uri: ${JSON.stringify(e)}`);
+      // 兜底：裁切失败时直接引用原 uri（进程存活期间可用），同样需要持久化
+      PreferencesUtil.putSync(SpKeys.WALLPAPER_PATH, uri);
       return uri;
     } finally {
       if (pixelMap) {

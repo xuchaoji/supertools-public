@@ -18,13 +18,13 @@
         "name": "dev",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.cer",
+          "certpath": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001A491D2E94E5C4FE64964530EB3C133D89515EB34BBF3EADF5AA33105EF5534D0319978305531D",
-          "profile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p7b",
+          "keyPassword": "0000001B7B53334686C08D5B20AF0E96DB56933559478FE84FDE1C25F4019268C7D2EBFC8021A045816757",
+          "profile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\chaoji\\.ohos\\config\\dev_supertools-public_-xsYorEQMTOWH_mq6T6YvyLfa5F0bNpYpbzmu1yViaQ=.p12",
-          "storePassword": "0000001A534E56318E1F3A2EAA93D0CBE127033AF20E2A0C8E18212A61409B19D3ABBA0AF807F25737F6"
+          "storeFile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
+          "storePassword": "0000001B3D4CBEF7D1A6AB75111C72D9F7379FD59B985C5E1C8E4546D3D068841F7B53D11C21AB158024A2"
         }
       }
     ],
@@ -35,7 +35,7 @@
         "targetSdkVersion": "5.0.5(17)",
         "compatibleSdkVersion": "5.0.5(17)",
         "runtimeOS": "HarmonyOS",
-        "bundleName": "com.xuchaoji.hmos.supertools",
+        "bundleName": "com.xuchaoji.hmos.supertools.dev",
         "label": "$string:app_name",
         "buildOption": {
           "strictMode": {

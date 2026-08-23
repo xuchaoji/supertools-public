@@ -32,6 +32,9 @@ const TAG: string = 'HOME_PAGE';
 const TOOLS_TAB_INDEX = 0;
 const SETTING_TAB_INDEX = 1;
 
+/** 裁切浮层顶部操作条的高度（vp）：按钮点击会冒泡到浮层 onTouch，按此排除按钮区域 */
+const TOP_BAR_STRIP_VP: number = 90;
+
 /** 裁切画布尺寸（vp），避免 ArkTS 对象字面量类型限制 */
 interface CropCanvasSize {
   cw: number;
@@ -128,13 +131,24 @@ export struct HomePage {
   private cropH: number = 2880;
   /** 画布尺寸是否已实测确认（onAreaChange 到达） */
   private canvasConfirmed: boolean = false;
-  /** 图片尺寸回调完成、可交互 */
-  private cropReady: boolean = false;
+  /** 图片尺寸回调完成、可交互（@Local：异步就绪后需刷新确定按钮的 enabled 状态） */
+  @Local cropReady: boolean = false;
   /** 裁切确认中（防止重复点击） */
   private cropBusy: boolean = false;
-  private pinchStartZoom: number = 1;
-  private panStartX: number = 0;
-  private panStartY: number = 0;
+  // ===== 手动触摸手势状态（不用 PanGesture/PinchGesture 识别器） =====
+  /** 0=无手势 1=单指平移 2=双指缩放 */
+  private touchMode: number = 0;
+  private touchStartX: number = 0;
+  private touchStartY: number = 0;
+  private panBaseOffsetX: number = 0;
+  private panBaseOffsetY: number = 0;
+  private pinchStartDist: number = 0;
+  private pinchBaseScale: number = 1;
+  // ===== 内容区壁纸全屏对齐（与 Index 根级壁纸共用同一画面，消除状态栏接缝） =====
+  /** 壁纸层高度（px，= 全屏高） */
+  private wallpaperLayerH: number = 2880;
+  /** 壁纸层向上偏移（px，= 状态栏高，使 pm 原点与屏幕原点对齐） */
+  private wallpaperLayerY: number = 0;
 
   aboutToAppear(): void {
     if (TargetConstants.IS_AG_TARGET) {
@@ -217,12 +231,7 @@ export struct HomePage {
     }
   }
 
-  /** 壁纸可显示的图片地址：直接使用存储路径（媒体 URI 或沙箱路径，沙箱路径不加 file:// 前缀） */
-  private wallpaperSrc(): string {
-    return this.wallpaperPath;
-  }
-
-  /** 加载内容区壁纸 PixelMap（盖住 NavDestination 白底） */
+  /** 加载内容区壁纸 PixelMap（盖住 NavDestination 白底，与 Index 根级壁纸同画面无缝衔接） */
   private loadWallpaperPm(): void {
     const path = WallpaperUtil.getPath();
     if (path === '') {
@@ -238,6 +247,10 @@ export struct HomePage {
     } catch (e) {
       // 使用默认尺寸
     }
+    // 与 Index 根级壁纸相同的全屏几何：高度=全屏高，向上偏移=状态栏高，
+    // 使本层渲染的画面与根级逐像素一致，状态栏与内容区不再出现两张错位的壁纸
+    this.wallpaperLayerH = h;
+    this.wallpaperLayerY = AppUtil.getStatusBarHeight();
     WallpaperUtil.loadPixelMap(path, w, h).then((pm: image.PixelMap | undefined) => {
       this.wallpaperPm = pm;
     });
@@ -272,7 +285,10 @@ export struct HomePage {
       // 导致 cropReady 永远为 false、确定按钮禁用、手势全部被吞
       WallpaperUtil.getImageSize(this.cropUri).then((size: image.Size | undefined) => {
         if (size && size.width > 0 && size.height > 0) {
+          hilog.info(0x0000, TAG, 'getImageSize ok (%{public}d×%{public}d)', size.width, size.height);
           this.initCropBase(size.width, size.height);
+        } else {
+          hilog.info(0x0000, TAG, 'getImageSize failed, rely on onComplete fallback');
         }
       });
     } catch (e) {
@@ -290,6 +306,7 @@ export struct HomePage {
     this.canvasConfirmed = false;
     this.origW = 0;
     this.origH = 0;
+    this.touchMode = 0;
   }
 
   /** 屏幕像素密度（px per vp） */
@@ -347,6 +364,10 @@ export struct HomePage {
       this.cropOffsetY = Math.max(0, (this.cropBaseH - ch) / 2);
       this.cropScale = 1;
       this.cropReady = true;
+      hilog.info(0x0000, TAG,
+        'crop ready d=%{public}s canvas=(%{public}s,%{public}s) orig=(%{public}d,%{public}d) base=(%{public}s,%{public}s) scale=%{public}s',
+        d.toFixed(1), cw.toFixed(1), ch.toFixed(1), this.origW, this.origH,
+        this.cropBaseW.toFixed(1), this.cropBaseH.toFixed(1), this.cropBaseScale.toFixed(2));
     } else {
       this.reclampOffset();
     }
@@ -368,10 +389,87 @@ export struct HomePage {
 
   /** 画布尺寸变化（onAreaChange）后记录实测尺寸并重算基准 */
   private onCropAreaChange(w: number, h: number): void {
-    this.cropW = w;
-    this.cropH = h;
+    // onAreaChange 的宽高单位是 vp，而 cropW/cropH 全链路按 px 语义使用（canvasVp 再除以密度），
+    // 必须在此处乘以密度转成 px，否则画布会被当作真实尺寸的 1/d，基准缩放和裁切区域全部偏小
+    const d = this.densityPxPerVp();
+    this.cropW = w * d;
+    this.cropH = h * d;
     this.canvasConfirmed = true;
+    hilog.info(0x0000, TAG, 'crop area vp=(%{public}s,%{public}s) px=(%{public}s,%{public}s)',
+      w.toFixed(1), h.toFixed(1), this.cropW.toFixed(1), this.cropH.toFixed(1));
     this.computeCropBase();
+  }
+
+  /** 两指之间的直线距离（vp，用窗口坐标，与组件位移/变换无关） */
+  private fingerDist(a: TouchObject, b: TouchObject): number {
+    const dx = a.windowX - b.windowX;
+    const dy = a.windowY - b.windowY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /**
+   * 手动实现裁切图片的平移/缩放（替代 PanGesture/PinchGesture）：
+   * 单指拖动平移，双指以画布中心为锚点缩放（1~5 倍）。
+   * onTouch 直接收到原始触摸流，不依赖手势识别器，稳定可靠。
+   */
+  private handleCropTouch(event: TouchEvent): void {
+    if (!this.cropReady) {
+      return;
+    }
+    const touches = event.touches;
+    if (event.type === TouchType.Down) {
+      // 顶部操作条（取消/确定按钮）区域：按钮点击会冒泡到这里，跳过避免误启动手势
+      if (touches.length > 0 && touches[0].windowY < TOP_BAR_STRIP_VP) {
+        return;
+      }
+      if (touches.length >= 2) {
+        // 双指：进入缩放模式
+        this.touchMode = 2;
+        this.pinchStartDist = this.fingerDist(touches[0], touches[1]);
+        this.pinchBaseScale = this.cropScale;
+        hilog.info(0x0000, TAG, 'crop touch pinch begin dist=%{public}s scale=%{public}s',
+          this.pinchStartDist.toFixed(1), this.cropScale.toFixed(2));
+      } else if (touches.length === 1) {
+        // 单指：进入平移模式
+        this.touchMode = 1;
+        this.touchStartX = touches[0].windowX;
+        this.touchStartY = touches[0].windowY;
+        this.panBaseOffsetX = this.cropOffsetX;
+        this.panBaseOffsetY = this.cropOffsetY;
+        hilog.info(0x0000, TAG, 'crop touch pan begin at=(%{public}s,%{public}s)',
+          this.touchStartX.toFixed(1), this.touchStartY.toFixed(1));
+      }
+    } else if (event.type === TouchType.Move) {
+      if (this.touchMode === 1 && touches.length === 1) {
+        // 单指平移：内容跟随手指移动（拖右 -> 内容右移）
+        const dx = touches[0].windowX - this.touchStartX;
+        const dy = touches[0].windowY - this.touchStartY;
+        const canvas = this.canvasVp();
+        const maxX = Math.max(0, this.cropBaseW * this.cropScale - canvas.cw);
+        const maxY = Math.max(0, this.cropBaseH * this.cropScale - canvas.ch);
+        this.cropOffsetX = Math.min(Math.max(this.panBaseOffsetX - dx, 0), maxX);
+        this.cropOffsetY = Math.min(Math.max(this.panBaseOffsetY - dy, 0), maxY);
+      } else if (this.touchMode === 2 && touches.length >= 2) {
+        // 双指缩放：以画布中心为锚点，偏移同步缩放避免内容跳变
+        const dist = this.fingerDist(touches[0], touches[1]);
+        if (this.pinchStartDist > 0) {
+          const newScale = Math.min(Math.max(this.pinchBaseScale * dist / this.pinchStartDist, 1), 5);
+          const k = newScale / this.cropScale;
+          const canvas = this.canvasVp();
+          const cw = canvas.cw;
+          const ch = canvas.ch;
+          const cx = this.cropOffsetX + cw / 2;
+          const cy = this.cropOffsetY + ch / 2;
+          this.cropScale = newScale;
+          const maxX = Math.max(0, this.cropBaseW * newScale - cw);
+          const maxY = Math.max(0, this.cropBaseH * newScale - ch);
+          this.cropOffsetX = Math.min(Math.max(cx * k - cw / 2, 0), maxX);
+          this.cropOffsetY = Math.min(Math.max(cy * k - ch / 2, 0), maxY);
+        }
+      }
+    } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+      this.touchMode = 0;
+    }
   }
 
   /** 确认裁切：按当前可视区域生成壁纸并应用 */
@@ -394,6 +492,11 @@ export struct HomePage {
         }
       };
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      hilog.info(0x0000, TAG,
+        'crop confirm scale=%{public}s region=(%{public}s,%{public}s %{public}s×%{public}s) out=(%{public}s×%{public}s)',
+        scale.toFixed(2), region.x.toFixed(1), region.y.toFixed(1),
+        region.size.width.toFixed(1), region.size.height.toFixed(1),
+        this.cropW.toFixed(1), this.cropH.toFixed(1));
       const path = await WallpaperUtil.cropAndSave(context, this.cropUri, region,
         { width: this.cropW, height: this.cropH });
       this.closeCrop();
@@ -776,7 +879,9 @@ export struct HomePage {
               .alignItems(HorizontalAlign.Start)
 
               if (this.wallpaperPath !== '') {
-                Image(this.wallpaperSrc())
+                // 直接用 PixelMap 做缩略图：Image 直接加载沙箱路径（含 file:// 前缀）在本环境不可靠，
+                // 与壁纸背景共用已解码的 wallpaperPm，避免空白缩略图
+                Image(this.wallpaperPm)
                   .width('44vp')
                   .height('44vp')
                   .borderRadius('8vp')
@@ -826,8 +931,12 @@ export struct HomePage {
   @Builder
   cropOverlay() {
     Stack() {
-      // 可平移/缩放的图片（尺寸与偏移均用 vp，与画布一致）
+      // 可平移/缩放的图片（尺寸与偏移均用 vp，与画布一致）。
+      // position(0,0) 固定布局原点：Stack 默认居中会把大图放到负坐标原点，
+      // 叠加 translate 后可视区域会偏到图片最右端（与确认裁切区域错位），
+      // 且负坐标原点的子组件命中测试为空（手势/触摸全部失效）。
       Image(this.cropUri)
+        .position({ x: 0, y: 0 })
         .width(this.cropBaseW * this.cropScale)
         .height(this.cropBaseH * this.cropScale)
         .translate({ x: -this.cropOffsetX, y: -this.cropOffsetY })
@@ -836,52 +945,13 @@ export struct HomePage {
           if (!event) {
             return;
           }
+          // getImageSize 已拿到原图尺寸时忽略 onComplete（它只是兜底，
+          // 且其 width/height 单位可能与原图像素不一致，重复计算无意义）
+          if (this.origW > 0) {
+            return;
+          }
           this.initCropBase(event.width, event.height);
         })
-        .gesture(
-          GestureGroup(GestureMode.Exclusive,
-            PanGesture({ fingers: 1, distance: 5 })
-              .onActionStart(() => {
-                this.panStartX = this.cropOffsetX;
-                this.panStartY = this.cropOffsetY;
-              })
-              .onActionUpdate((event: GestureEvent) => {
-                if (!this.cropReady) {
-                  return;
-                }
-                const canvas = this.canvasVp();
-                const cw = canvas.cw;
-                const ch = canvas.ch;
-                const maxX = Math.max(0, this.cropBaseW * this.cropScale - cw);
-                const maxY = Math.max(0, this.cropBaseH * this.cropScale - ch);
-                this.cropOffsetX = Math.min(Math.max(this.panStartX - event.offsetX, 0), maxX);
-                this.cropOffsetY = Math.min(Math.max(this.panStartY - event.offsetY, 0), maxY);
-              }),
-            PinchGesture({ fingers: 2 })
-              .onActionStart(() => {
-                this.pinchStartZoom = this.cropScale;
-              })
-              .onActionUpdate((event: GestureEvent) => {
-                if (!this.cropReady) {
-                  return;
-                }
-                const newScale = Math.min(Math.max(this.pinchStartZoom * event.scale, 1), 5);
-                const k = newScale / this.cropScale;
-                const canvas = this.canvasVp();
-                const cw = canvas.cw;
-                const ch = canvas.ch;
-                // 以画布中心为锚点缩放，偏移同步缩放避免内容跳变
-                const cx = this.cropOffsetX + cw / 2;
-                const cy = this.cropOffsetY + ch / 2;
-                this.cropScale = newScale;
-                const maxX = Math.max(0, this.cropBaseW * newScale - cw);
-                const maxY = Math.max(0, this.cropBaseH * newScale - ch);
-                this.cropOffsetX = Math.min(Math.max(cx * k - cw / 2, 0), maxX);
-                this.cropOffsetY = Math.min(Math.max(cy * k - ch / 2, 0), maxY);
-              })
-          )
-        )
-
       // 底部提示（HitTestMode.None：自身不参与触摸测试，确保手势与按钮不被覆盖层拦截）
       Column() {
         Blank()
@@ -894,7 +964,10 @@ export struct HomePage {
       .height('100%')
       .hitTestBehavior(HitTestMode.None)
 
-      // 顶部操作条（放最后=最上层，按钮始终可点）
+      // 顶部操作条（放最后=最上层，按钮始终可点）。
+      // Stack 默认居中布局，若不加 position 该行会被放到画布正中央，
+      // 既挡在用户捏合/拖拽的必经之路上（拦截手势），视觉上也是悬浮在中间。
+      // position({x:0,y:0}) 固定到浮层左上角，恢复“顶部操作条”的本意。
       Row() {
         Button('取消')
           .height(36)
@@ -915,11 +988,19 @@ export struct HomePage {
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .position({ x: 0, y: 0 })
     }
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Black)
     .clip(true)
+    // 平移/缩放直接消费 TouchEvent 手写实现：本环境 PanGesture/PinchGesture 识别器
+    // 始终不触发，且图片组件因尺寸/位移原因命中测试为空（触摸到不了图片），
+    // 因此把 onTouch 挂在浮层根 Stack 上：单指 = 拖动平移，双指 = 缩放。
+    // 注意：按钮点击也会冒泡到这里，需用顶部条带区域排除按钮按下误启动手势。
+    .onTouch((event: TouchEvent) => {
+      this.handleCropTouch(event);
+    })
     .onAreaChange((oldValue: Area, newValue: Area) => {
       const w = newValue.width as number;
       const h = newValue.height as number;
@@ -931,11 +1012,13 @@ export struct HomePage {
 
   build() {
     Stack() {
-      // 内容区壁纸：盖住 NavDestination 的白底（Index 根级壁纸只覆盖状态栏区域）
+      // 内容区壁纸：盖住 NavDestination 的白底（Index 根级壁纸只负责状态栏区域）。
+      // 以全屏尺寸 + 状态栏偏移对齐根级壁纸，保证两层渲染同一画面、无缝衔接
       if (this.wallpaperPm) {
         Image(this.wallpaperPm)
           .width('100%')
-          .height('100%')
+          .height(`${this.wallpaperLayerH}px`)
+          .position({ y: `-${this.wallpaperLayerY}px` })
           .objectFit(ImageFit.Cover)
       }
       // 官方 HDS 沉浸光感 Tab（系统 6.1.0+），否则降级为手绘悬浮胶囊
