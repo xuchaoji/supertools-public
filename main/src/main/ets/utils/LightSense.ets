@@ -1,4 +1,3 @@
-import { uiMaterial } from '@kit.ArkUI';
 import { hdsEffect, hdsMaterial } from '@kit.UIDesignKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { PreferencesUtil } from '@pura/harmony-utils';
@@ -9,11 +8,10 @@ import { SpKeys } from '../constant/SpKeys';
  *
  * 档位：0=关闭 1=柔和 2=标准 3=精致
  * 各表面（卡片毛玻璃、Tab 栏材质、点光源光效）统一按档位取值，
- * 全部使用官方 API（backgroundBlurStyle / systemMaterial / hdsEffect / hdsMaterial），非自绘模拟。
+ * 全部使用官方 API（backgroundBlurStyle / hdsEffect / hdsMaterial），非自绘模拟。
  *
  * 持久化：SpKeys.LIGHT_SENSE；内存同步：AppStorage['LightSense']。
- * 能力降级：HarmonyOS 7.0(API 26) 起支持 systemMaterial；6.0(API 20) 起支持 hdsEffect；
- * 更低版本自动回退为 backgroundBlurStyle + 透明度（现状兜底）。
+ * 能力降级：6.0(API 20) 起支持 hdsEffect；更低版本自动回退为 backgroundBlurStyle + 透明度（现状兜底）。
  */
 export class LightSense {
   static readonly LEVEL_OFF: number = 0;
@@ -46,15 +44,6 @@ export class LightSense {
   static levelName(level: number): string {
     const i = Math.min(Math.max(Math.round(level), 0), 3);
     return LightSense.LEVEL_NAMES[i];
-  }
-
-  /** 是否支持官方沉浸材质 systemMaterial（HarmonyOS 7.0 / API 26+） */
-  static supportsSystemMaterial(): boolean {
-    try {
-      return deviceInfo.distributionOSApiVersion >= 70000;
-    } catch (e) {
-      return false;
-    }
   }
 
   /** 是否支持 HDS 视觉特效（点光源/流光，HarmonyOS 6.0 / API 20+） */
@@ -96,38 +85,32 @@ export class LightSense {
     return BlurStyle.COMPONENT_ULTRA_THICK;
   }
 
-  /**
-   * 官方沉浸材质（systemMaterial）：仅精致档且支持 API 26 时返回；
-   * 否则 undefined（表面回退为 backgroundBlurStyle 毛玻璃）。
-   * 低算力设备由系统自动降级为边框/阴影。
-   */
-  static immersiveMaterial(level: number): uiMaterial.ImmersiveMaterial | undefined {
-    if (level < LightSense.LEVEL_EXQUISITE || !LightSense.supportsSystemMaterial()) {
-      return undefined;
-    }
-    return new uiMaterial.ImmersiveMaterial({
-      style: uiMaterial.ImmersiveStyle.REGULAR,
-      materialColor: Color.Transparent,
-      applyShadow: false,
-      lightEffect: { color: Color.White }
-    });
-  }
-
   /** 点光源光效（官方视觉特效）：标准档柔和、精致档明亮；低版本/关闭档返回 undefined */
   static pointLightEffect(level: number): hdsEffect.PointLightEffect | undefined {
     if (level < LightSense.LEVEL_SMOOTH || !LightSense.supportsHdsEffect()) {
       return undefined;
     }
+    if (level >= LightSense.LEVEL_EXQUISITE) {
+      // 精致：明亮光源照亮卡片边缘（折射感），光感明显
+      return {
+        sourceType: hdsEffect.PointLightSourceType.BRIGHT,
+        illuminatedType: hdsEffect.PointLightIlluminatedType.BORDER,
+        options: {
+          color: '#FFFFFF',
+          intensity: 1.0,
+          height: 80,
+          bloom: 1.0
+        }
+      };
+    }
     return {
-      sourceType: level >= LightSense.LEVEL_EXQUISITE
-        ? hdsEffect.PointLightSourceType.BRIGHT
-        : hdsEffect.PointLightSourceType.SOFT,
-      illuminatedType: hdsEffect.PointLightIlluminatedType.BORDER_CONTENT,
+      sourceType: hdsEffect.PointLightSourceType.SOFT,
+      illuminatedType: hdsEffect.PointLightIlluminatedType.BORDER,
       options: {
         color: '#FFFFFF',
-        intensity: level >= LightSense.LEVEL_EXQUISITE ? 0.6 : 0.35,
-        height: 48,
-        bloom: level >= LightSense.LEVEL_EXQUISITE ? 0.5 : 0.3
+        intensity: 0.5,
+        height: 60,
+        bloom: 0.5
       }
     };
   }

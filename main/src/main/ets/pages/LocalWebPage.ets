@@ -15,6 +15,7 @@ import { AppUtil, PreferencesUtil } from '@pura/harmony-utils';
 import { WallpaperHost } from '../components/WallpaperHost';
 import { mediaquery } from '@kit.ArkUI';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
+import { LightSense } from '../utils/LightSense';
 
 // --- 类型定义 ---
 interface MenuElement {
@@ -563,13 +564,15 @@ export struct LocalWebPage {
 
         Toggle({ type: ToggleType.Switch, isOn: this.viewModel.isServerRunning }).onChange(() => this.toggleServer())
       }
-      // 毛玻璃状态卡片：透明化让壁纸透出，避免状态栏下方出现整块白条（模糊档位跟随全局光感）
+      // 光感状态卡片：通透玻璃 + 边缘折射（非磨砂），壁纸透出
       .padding(16)
       .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle())
       .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
       .linearGradient({ angle: 135, colors: ImmersiveStyles.cardSurfaceColors(this.isDark) })
+      .border({ width: ImmersiveStyles.cardRimWidth(), color: ImmersiveStyles.cardOuterRim(this.isDark) })
       .borderRadius(12)
       .clip(true)
+      .visualEffect(LightSense.lightVisualEffect())
       .margin(16)
     }
   }
@@ -656,12 +659,14 @@ export struct LocalWebPage {
               .height(40)
               .bindMenu(this.getMenuItems(item))
           }
-          // 毛玻璃卡片：透明化让壁纸透出，与顶部状态卡片风格一致（模糊档位跟随全局光感）
+          // 光感文件行：通透玻璃 + 边缘折射（非磨砂），壁纸透出
           .padding(12).width('100%')
           .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle())
           .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
+          .border({ width: ImmersiveStyles.cardRimWidth(), color: ImmersiveStyles.cardOuterRim(this.isDark) })
           .borderRadius(12)
           .clip(true)
+          .visualEffect(LightSense.lightVisualEffect())
         }
       })
       if (this.viewModel.fileList.length === 0) {

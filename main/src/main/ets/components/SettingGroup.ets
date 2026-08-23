@@ -34,22 +34,18 @@ export struct SettingGroup {
       ListItemGroup() {
         this.content()
       }
-      // 沉浸光感：毛玻璃基底（档位驱动：精致档换官方 systemMaterial，其余为 backgroundBlurStyle）
+      .borderRadius(ImmersiveStyles.cardRadius())
+      .clip(true)
+      // 与工具箱卡片背景保持一致的沉浸光感配方：
+      // 基底色 -> 毛玻璃模糊 -> 光感渐变 -> rim 亮边 -> 点光源，不叠加 systemMaterial 染色
       .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
-      .backgroundBlurStyle(
-        LightSense.immersiveMaterial(LightSense.getLevel()) ? BlurStyle.NONE : ImmersiveStyles.cardBlurStyle())
-      .systemMaterial(LightSense.immersiveMaterial(LightSense.getLevel()))
-      // 点光源光效（官方视觉特效，标准/精致档生效）
-      .visualEffect(LightSense.lightVisualEffect())
-      // 表面光感渐变（左上光源 -> 右下微暗角）
+      .backdropBlur(ImmersiveStyles.cardBlurRadius())
       .linearGradient({
         angle: 135,
         colors: ImmersiveStyles.cardSurfaceColors(this.isDark)
       })
-      .borderRadius('16vp')
-      .clip(true)
-      // 外边缘受光（非对称 rim light，模拟折射衰减）
-      .border({ width: 1, color: ImmersiveStyles.cardOuterRim(this.isDark) })
+      .border({ width: ImmersiveStyles.cardRimWidth(), color: ImmersiveStyles.cardOuterRim(this.isDark) })
+      .visualEffect(LightSense.lightVisualEffect())
       // 核心功能：自动添加分割线
       .divider({
         strokeWidth: '1px',
@@ -62,8 +58,8 @@ export struct SettingGroup {
     .width('100%')
     .height('auto') // 高度自适应内容
     .scrollBar(BarState.Off)
-    // 柔和投影
-    .borderRadius('16vp')
+    // 柔和投影（与工具箱卡片一致，依据圆角边界生成）
+    .borderRadius(ImmersiveStyles.cardRadius())
     .shadow({
       radius: 14,
       color: ImmersiveStyles.cardShadow(this.isDark),

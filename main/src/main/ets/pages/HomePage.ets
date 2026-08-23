@@ -799,7 +799,10 @@ export struct HomePage {
           .fontSize($r('sys.float.Body_L'))
           .fontWeight(FontWeight.Bold)
           .fontColor($r('sys.color.font_secondary'))
+          // 深色/浅色模式可读性：阴影颜色与文字相反
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
+        // 工具箱设置项：与工具箱卡片背景保持一致的沉浸光感配方
         SettingGroup() {
           SettingSwitchItem({
             title: '录屏是否启用H265',
@@ -824,6 +827,8 @@ export struct HomePage {
           .fontWeight(FontWeight.Bold)
           .fontColor($r('sys.color.font_secondary'))
           .visibility(TargetConstants.HAS_FLOATING_PERM ? Visibility.Visible:Visibility.None)
+          // 深色/浅色模式可读性：阴影颜色与文字相反
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
         SettingGroup({
           vis: TargetConstants.HAS_FLOATING_PERM
@@ -873,6 +878,8 @@ export struct HomePage {
           .fontSize($r('sys.float.Body_L'))
           .fontWeight(FontWeight.Bold)
           .fontColor($r('sys.color.font_secondary'))
+          // 深色/浅色模式可读性：阴影颜色与文字相反
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
         SettingGroup() {
           SettingSwitchItem({
@@ -899,6 +906,8 @@ export struct HomePage {
           .fontSize($r('sys.float.Body_L'))
           .fontWeight(FontWeight.Bold)
           .fontColor($r('sys.color.font_secondary'))
+          // 深色/浅色模式可读性：阴影颜色与文字相反
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
         SettingGroup() {
           ListItem() {
@@ -908,12 +917,15 @@ export struct HomePage {
                   .fontColor($r('sys.color.font_primary'))
                   .fontSize('16vp')
                   .fontWeight(FontWeight.Medium)
+                  // 深色/浅色模式可读性：阴影颜色与文字相反
+                  .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
                 Text('选择图片作为主页背景，毛玻璃卡片与悬浮导航将实时呈现光感效果')
                   .fontSize('12vp')
                   .fontColor($r('sys.color.font_secondary'))
                   .maxLines(2)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
+                  .textShadow(ImmersiveStyles.textShadow(this.isDark))
               }
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
@@ -952,10 +964,13 @@ export struct HomePage {
                 .fontSize('16vp')
                 .fontWeight(FontWeight.Medium)
                 .layoutWeight(1)
+                // 深色/浅色模式可读性：阴影颜色与文字相反
+                .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
               Text(this.wallpaperBlur <= 0 ? '无' : `${Math.round(this.wallpaperBlur)}%`)
                 .fontSize('13vp')
                 .fontColor($r('sys.color.font_secondary'))
+                .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
               Slider({
                 value: this.wallpaperBlur,
@@ -981,10 +996,13 @@ export struct HomePage {
                 .fontSize('16vp')
                 .fontWeight(FontWeight.Medium)
                 .layoutWeight(1)
+                // 深色/浅色模式可读性：阴影颜色与文字相反
+                .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
               Text(LightSense.levelName(this.lightSense))
                 .fontSize('13vp')
                 .fontColor($r('sys.color.font_secondary'))
+                .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
               Slider({
                 value: this.lightSense,
@@ -1178,6 +1196,8 @@ export struct HomePage {
                     .ellipsisMode(EllipsisMode.END)
                     .textAlign(TextAlign.Center)
                     .width('100%')
+                    // 深色/浅色模式可读性：阴影颜色与文字相反
+                    .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
                   Text(item.desc)
                     .fontSize(10)
@@ -1186,6 +1206,8 @@ export struct HomePage {
                     .ellipsisMode(EllipsisMode.END)
                     .textAlign(TextAlign.Center)
                     .width('100%')
+                    // 深色/浅色模式可读性：阴影颜色与文字相反
+                    .textShadow(ImmersiveStyles.textShadow(this.isDark))
                 }
                 .justifyContent(FlexAlign.Center)
                 .alignItems(HorizontalAlign.Center)
@@ -1198,7 +1220,9 @@ export struct HomePage {
               .clip(true)
               .borderRadius(ImmersiveStyles.cardRadius())
               // 外边缘受光（非对称 rim light，模拟折射衰减）
-              .border({ width: 1, color: ImmersiveStyles.cardOuterRim(this.isDark) })
+              .border({ width: ImmersiveStyles.cardRimWidth(), color: ImmersiveStyles.cardOuterRim(this.isDark) })
+              // 点光源光效（官方视觉特效，照亮卡片边缘）
+              .visualEffect(LightSense.lightVisualEffect())
               // 柔和投影（依据圆角边界生成）
               .shadow({
                 radius: 14,
