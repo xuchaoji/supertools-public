@@ -13,4 +13,6 @@ export class SpKeys {
   public static readonly WALLPAPER_BLUR: string = 'wallpaper_blur';
   /** 全局光感档位（0=关闭 1=柔和 2=标准 3=精致） */
   public static readonly LIGHT_SENSE: string = 'light_sense';
+  /** 二维码生成历史（JSON 数组，[QrHistoryItem]） */
+  public static readonly QR_HISTORY: string = 'qr_history';
 }

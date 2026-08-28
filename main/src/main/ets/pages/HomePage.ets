@@ -102,6 +102,15 @@ export struct HomePage {
     }
     ,
     {
+      name: '二维码生成',
+      desc: '文本生成二维码，支持保存相册',
+      icon: $r('app.media.qr_code'),
+      onClick: (event: ClickEvent) => {
+        HMRouterMgr.push({ pageUrl: PageNames.QR_CODE_PAGE })
+      }
+    }
+    ,
+    {
       name: 'HDC 调试',
       desc: '本地 HDC 终端，直连 hdcd 调试本机',
       icon: $r('app.media.crafting_table'),

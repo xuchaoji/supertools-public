@@ -10,4 +10,5 @@
   public static readonly DEVICE_INFO_PAGE = 'deviceInfoPage';
   public static readonly APP_LINKING_TOOL = 'appLinkingTool';
   public static readonly HDC_DEBUG_PAGE = 'hdcDebugPage';
+  public static readonly QR_CODE_PAGE = 'qrCodePage';
 }
