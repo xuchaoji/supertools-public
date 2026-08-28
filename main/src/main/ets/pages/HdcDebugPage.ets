@@ -6,10 +6,11 @@ import { SpKeys } from "../constant/SpKeys";
 import { connection } from "@kit.NetworkKit";
 import { KeyCode } from "@kit.InputKit";
 import { pasteboard } from '@kit.BasicServicesKit';
-import { promptAction } from '@kit.ArkUI';
+import { promptAction, mediaquery } from '@kit.ArkUI';
 import fs from '@ohos.file.fs';
 import { picker } from '@kit.CoreFileKit';
 import { WallpaperHost } from '../components/WallpaperHost';
+import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 
 type EntryType = "input" | "output" | "error" | "system" | "meta";
 
@@ -67,6 +68,9 @@ export struct HdcDebugPage {
   private scroller: Scroller = new Scroller();
   private hdcService: HdcService = new HdcService();
   private entrySeq: number = 0;
+  /** 沉浸光感：跟随系统深/浅色模式，驱动文字阴影保证任意壁纸背景可读 */
+  @Local isDark: boolean = false;
+  private themeMq: mediaquery.MediaQueryListener | null = null;
 
   private readonly quickGroups: QuickGroup[] = [
     {
@@ -128,6 +132,7 @@ export struct HdcDebugPage {
 
   aboutToAppear(): void {
     hilog.info(0x0000, "HDC_Z", "HdcDebugPage aboutToAppear");
+    this.initThemeListener();
     this.addSystem("=== SuperTools HDC ===");
     this.addSystem("Starting HDC server...");
     this.hdcService.startServer();
@@ -152,7 +157,22 @@ export struct HdcDebugPage {
   }
 
   aboutToDisappear(): void {
+    this.themeMq?.off('change');
+    this.themeMq = null;
     this.hdcService.destroy();
+  }
+
+  /** 订阅系统深/浅色模式变化，驱动文字阴影参数切换 */
+  private initThemeListener(): void {
+    try {
+      this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(display-mode: dark)');
+      this.isDark = this.themeMq.matches;
+      this.themeMq.on('change', (event: mediaquery.MediaQueryResult) => {
+        this.isDark = event.matches;
+      });
+    } catch (e) {
+      this.isDark = false;
+    }
   }
 
   private getLocalIp(): void {
@@ -549,16 +569,20 @@ export struct HdcDebugPage {
       Image("app.media.back_arrow").width(24).height(24).fillColor("sys.color.font_primary")
         .onClick(() => { HMRouterMgr.pop(); })
       Text("HDC Debug").fontSize(20).fontWeight(FontWeight.Bold).fontColor("sys.color.font_emphasize")
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
       Blank()
       Text(this.serverStatus === "ready" ? "● Server" : this.serverStatus === "failed" ? "● Failed" : "● Starting")
         .fontSize(11).fontColor(
           this.serverStatus === "ready" ? "#28A745" : this.serverStatus === "failed" ? "#F44336" : "#FF9800"
         ).fontWeight(FontWeight.Medium)
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
       Text("Copy").fontSize(12).fontColor("sys.color.font_secondary")
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
         .padding({ left: 10, right: 10, top: 5, bottom: 5 })
         .backgroundColor("sys.color.comp_background_gray").borderRadius(6)
         .onClick(() => { this.copyAll(); })
       Text("Clear").fontSize(12).fontColor("sys.color.font_secondary")
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
         .padding({ left: 10, right: 10, top: 5, bottom: 5 })
         .backgroundColor("sys.color.comp_background_gray").borderRadius(6)
         .onClick(() => { this.clearTerminal(); })
@@ -573,9 +597,11 @@ export struct HdcDebugPage {
         ? "已连接 " + this.connectIp + ":" + (this.connectPort.trim() || "8710")
         : "未连接远程设备 · 可执行 list targets / version 等主机命令")
         .fontSize(11).fontColor("sys.color.font_secondary").maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
       Blank()
       Text(this.isConnected ? "●" : "○").fontSize(12)
         .fontColor(this.isConnected ? "#28A745" : "sys.color.font_secondary")
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
     }.width("100%").padding({ left: 16, right: 16, top: 2, bottom: 4 })
   }
 
@@ -584,10 +610,13 @@ export struct HdcDebugPage {
     Column() {
       Row({ space: 8 }) {
         Text("Terminal").fontSize(13).fontWeight(FontWeight.Bold).fontColor("sys.color.font_emphasize")
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
         Text(this.entries.length + " 行").fontSize(10).fontColor("sys.color.font_secondary")
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
         Blank()
         Text(this.followOutput ? "⤓ 跟随" : "⤒ 暂停")
           .fontSize(11).fontColor(this.followOutput ? "#007AFF" : "sys.color.font_secondary")
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .backgroundColor("sys.color.comp_background_gray").borderRadius(4)
           .onClick(() => { this.followOutput = !this.followOutput; })
@@ -600,6 +629,7 @@ export struct HdcDebugPage {
         ForEach(this.entries, (e: TerminalEntry) => {
           ListItem() {
             Text(e.text).fontSize(13).fontFamily("monospace").fontColor(this.entryColor(e.type))
+              .textShadow(ImmersiveStyles.textShadow(this.isDark))
               .copyOption(CopyOptions.LocalDevice)
               .width("100%").padding({ top: 2, bottom: 2, left: 12, right: 12 })
           }
@@ -610,6 +640,7 @@ export struct HdcDebugPage {
             Row() {
               LoadingProgress().width(12).height(12).margin({ right: 6 })
               Text("running...").fontSize(12).fontColor("sys.color.font_secondary").fontFamily("monospace")
+                .textShadow(ImmersiveStyles.textShadow(this.isDark))
             }.padding({ left: 12, right: 12, top: 4, bottom: 4 })
           }
         }
@@ -659,9 +690,12 @@ export struct HdcDebugPage {
     Column() {
       Row({ space: 8 }) {
         Text("已抓取日志").fontSize(16).fontWeight(FontWeight.Bold)
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
         Text(this.logFiles.length + ' 个').fontSize(11).fontColor("sys.color.font_secondary")
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
         Blank()
         Text("关闭").fontSize(13).fontColor("#007AFF")
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
           .onClick(() => { this.showLogManager = false; })
       }.width("100%").padding({ left: 16, right: 16, top: 14, bottom: 8 })
 
@@ -670,6 +704,7 @@ export struct HdcDebugPage {
       if (this.logFiles.length === 0) {
         Column() {
           Text("暂无已抓取日志").fontSize(13).fontColor("sys.color.font_secondary")
+            .textShadow(ImmersiveStyles.textShadow(this.isDark))
         }
         .layoutWeight(1).width("100%").justifyContent(FlexAlign.Center)
       } else {
@@ -679,18 +714,22 @@ export struct HdcDebugPage {
               Row({ space: 8 }) {
                 Column({ space: 2 }) {
                   Text(f.name).fontSize(12).fontFamily("monospace")
+                    .textShadow(ImmersiveStyles.textShadow(this.isDark))
                     .maxLines(1).ellipsisMode(EllipsisMode.END)
                   Text(f.sizeKB + ' KB · ' + this.formatLogTime(f.mtime))
                     .fontSize(10).fontColor("sys.color.font_secondary")
+                    .textShadow(ImmersiveStyles.textShadow(this.isDark))
                 }
                 .layoutWeight(1).alignItems(HorizontalAlign.Start)
 
                 Text("导出").fontSize(11).fontColor("#007AFF")
+                  .textShadow(ImmersiveStyles.textShadow(this.isDark))
                   .padding({ top: 3, bottom: 3, left: 8, right: 8 })
                   .backgroundColor("sys.color.comp_background_gray").borderRadius(4)
                   .onClick(() => { this.exportFiles([f.name]); })
 
                 Text("删除").fontSize(11).fontColor("#F44336")
+                  .textShadow(ImmersiveStyles.textShadow(this.isDark))
                   .padding({ top: 3, bottom: 3, left: 8, right: 8 })
                   .backgroundColor("sys.color.comp_background_gray").borderRadius(4)
                   .onClick(() => { this.deleteLogFile(f.name); })
@@ -708,10 +747,12 @@ export struct HdcDebugPage {
 
       Row({ space: 12 }) {
         Text("导出全部").fontSize(13).fontColor("#007AFF")
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
           .padding({ top: 8, bottom: 8, left: 12, right: 12 })
           .onClick(() => { this.exportAllLogs(); })
         Blank()
         Text("清空全部").fontSize(13).fontColor("#F44336")
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
           .padding({ top: 8, bottom: 8, left: 12, right: 12 })
           .onClick(() => { this.clearAllLogs(); })
       }.width("100%").padding({ left: 16, right: 16, top: 6, bottom: 12 })
@@ -724,6 +765,7 @@ export struct HdcDebugPage {
   logToolsRow() {
     Row({ space: 8 }) {
       Text("Debug日志").fontSize(11).fontColor("sys.color.font_secondary")
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
       // 自定义开关：Toggle 的 onChange 在部分设备上不可靠，用 Text 点击切换
       Text(this.debugLogOn ? "ON" : "OFF")
         .fontSize(10).fontWeight(FontWeight.Bold)
@@ -738,6 +780,7 @@ export struct HdcDebugPage {
       Text(this.capturing ? "停止" : "抓取")
         .fontSize(12)
         .fontColor(this.capturing ? Color.White : "sys.color.font_secondary")
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
         .padding({ top: 4, bottom: 4, left: 10, right: 10 })
         .backgroundColor(this.capturing ? "#E53935" : "sys.color.comp_background_gray")
         .borderRadius(6)
@@ -749,6 +792,7 @@ export struct HdcDebugPage {
           }
         })
       Text("管理").fontSize(12).fontColor("sys.color.font_secondary")
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
         .padding({ top: 4, bottom: 4, left: 10, right: 10 })
         .backgroundColor("sys.color.comp_background_gray").borderRadius(6)
         .onClick(() => { this.openLogManager(); })
@@ -763,6 +807,7 @@ export struct HdcDebugPage {
           ForEach(this.quickGroups, (g: QuickGroup) => {
             Text(g.title)
               .fontSize(11).fontColor(this.quickCategory === g.title ? Color.White : "sys.color.font_secondary")
+              .textShadow(ImmersiveStyles.textShadow(this.isDark))
               .backgroundColor(this.quickCategory === g.title ? "#007AFF" : "sys.color.comp_background_gray")
               .padding({ top: 4, bottom: 4, left: 10, right: 10 }).borderRadius(12)
               .onClick(() => { this.quickCategory = g.title; })
@@ -775,6 +820,7 @@ export struct HdcDebugPage {
         Row({ space: 6 }) {
           ForEach(this.currentQuickCmds(), (c: QuickCmd) => {
             Text(c.label).fontSize(11).fontColor("sys.color.font_secondary").fontFamily("monospace")
+              .textShadow(ImmersiveStyles.textShadow(this.isDark))
               .padding({ top: 5, bottom: 5, left: 10, right: 10 })
               .backgroundColor("sys.color.comp_background_gray").borderRadius(12)
               .opacity(this.isRunning ? 0.5 : 1)
@@ -798,10 +844,12 @@ export struct HdcDebugPage {
     if (this.cmdHistory.length > 0) {
       Row({ space: 6 }) {
         Text("最近:").fontSize(10).fontColor("sys.color.font_secondary")
+          .textShadow(ImmersiveStyles.textShadow(this.isDark))
         Scroll() {
           Row({ space: 6 }) {
             ForEach(this.cmdHistory.slice(0, 8), (c: string, i: number) => {
               Text(c).fontSize(10).fontColor("sys.color.font_secondary").fontFamily("monospace")
+                .textShadow(ImmersiveStyles.textShadow(this.isDark))
                 .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
                 .padding({ top: 4, bottom: 4, left: 8, right: 8 })
                 .backgroundColor("sys.color.comp_background_gray").borderRadius(10)
@@ -837,6 +885,7 @@ export struct HdcDebugPage {
     Column() {
       Text(symbol).fontSize(16).fontWeight(FontWeight.Bold)
         .fontColor(this.cmdHistory.length > 0 ? "sys.color.font_primary" : "sys.color.font_secondary")
+        .textShadow(ImmersiveStyles.textShadow(this.isDark))
     }
     .width(36).height(40)
     .justifyContent(FlexAlign.Center)

@@ -71,7 +71,7 @@ export struct HomePage {
     {
       name: 'App Linking 解析',
       desc: '元服务/App链接深度拆解与跳转测试',
-      icon: $r('app.media.code'),
+      icon: $r('app.media.app_link'),
       onClick: (event: ClickEvent) => {
         HMRouterMgr.push({ pageUrl: PageNames.APP_LINKING_TOOL })
       }
@@ -87,7 +87,7 @@ export struct HomePage {
     {
       name: '本地web服务',
       desc: '构建本地静态web服务器',
-      icon: $r('app.media.redstone_repeater'),
+      icon: $r('app.media.web_server'),
       onClick: () => {
         HMRouterMgr.push({ pageUrl: PageNames.LOCAL_WEB_PAGE })
       }
@@ -95,7 +95,7 @@ export struct HomePage {
     {
       name: '字符串转换',
       desc: 'Base64、Url编解码',
-      icon: $r('app.media.code'),
+      icon: $r('app.media.string_convert'),
       onClick: (event) => {
         HMRouterMgr.push({ pageUrl: PageNames.STR_CONVERT })
       }
@@ -113,7 +113,7 @@ export struct HomePage {
     {
       name: 'HDC 调试',
       desc: '本地 HDC 终端，直连 hdcd 调试本机',
-      icon: $r('app.media.crafting_table'),
+      icon: $r('app.media.hdc_debug'),
       onClick: (event: ClickEvent) => {
         HMRouterMgr.push({ pageUrl: PageNames.HDC_DEBUG_PAGE })
       }
