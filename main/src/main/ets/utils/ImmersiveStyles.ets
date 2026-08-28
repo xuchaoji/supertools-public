@@ -179,7 +179,7 @@ export class ImmersiveStyles {
 
   // ===================== 底部 Tab 栏 =====================
 
-  /** Tab 栏毛玻璃基底色：可读性优先，透明度比卡片更高 */
+  /** Tab 栏毛玻璃基底色：可读性优先，透明度比卡片更高（悬浮胶囊改用系统模糊材质 backgroundBlurStyle，此处保留备用） */
   static tabBarBase(isDark: boolean): string {
     return isDark ? 'rgba(24, 24, 27, 0.8)' : 'rgba(255, 255, 255, 0.88)';
   }
