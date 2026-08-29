@@ -62,7 +62,7 @@ export struct HomePage {
   private hdsTabsController: HdsTabsController = new HdsTabsController();
   // 设备系统版本 >= 6.1.0(API 23) 才支持 HDS 沉浸材质，否则降级为手绘悬浮胶囊
   private supportImmersiveTabs: boolean = deviceInfo.distributionOSApiVersion >= 60100;
-  /** 智感握姿：握持侧（0=未知/未握持/双手 1=左手 2=右手），驱动悬浮 Tab 自适应收窄并贴近握持侧 */
+  /** 智感握姿：握持侧（0=未知/未握持/双手 1=左手 2=右手），驱动 HDS 悬浮栏 adaptToHandedness */
   @Local gripSide: number = 0;
   private gripSupported: boolean = false;
   private gripCallback: (status: motion.HoldingHandStatus) => void = () => {};
@@ -206,16 +206,18 @@ export struct HomePage {
     this.loadWallpaperPm();
   }
 
-  /** 当前 HDS 悬浮栏样式（双手/未知握持模式）：固定宽度居中 */
+  /** 当前 HDS 悬浮栏样式：双手/未知 = 固定宽度居中；单手握持 = 收窄 + 系统原生贴边 */
   private currentBarStyle(): HdsTabsFloatingStyle {
-    const style: HdsTabsFloatingStyle = {
-      // 不跟随手持方向（系统无左右手设置，adaptToHandedness 无效）；双手/未知时保持居中
-      adaptToHandedness: false,
-      // 悬浮 Tab 栏宽度 = 屏幕 75%（436vp × 75% ≈ 327vp，用数值避免百分比解析错位）
+    return {
+      // 单手握持时跟随手持方向（系统原生机制；支持的系统上悬浮栏贴近握持侧，
+      // 本机系统无左右手设置时保持居中）
+      adaptToHandedness: this.gripSide === 1 || this.gripSide === 2,
+      // 悬浮 Tab 栏宽度（vp）：双手 = 当前固定宽度（327）；单手 = 自适应收窄（216），
+      // 两个入口仍完整可见且更贴近拇指可及范围
       barWidth: {
-        smallWidth: 327,
-        mediumWidth: 327,
-        largeWidth: 327
+        smallWidth: (this.gripSide === 1 || this.gripSide === 2) ? 216 : 327,
+        mediumWidth: (this.gripSide === 1 || this.gripSide === 2) ? 216 : 327,
+        largeWidth: (this.gripSide === 1 || this.gripSide === 2) ? 216 : 327
       },
       // 悬浮栏距底部间距（vp 单位；系统手势条约 33vp，这里留 40vp 避开）
       barBottomMargin: 40,
@@ -225,13 +227,13 @@ export struct HomePage {
         materialLevel: LightSense.tabMaterialLevel(this.lightSense),
       },
     };
-    return style;
   }
 
   /**
-   * 订阅智感握姿（握持姿态变化）：
-   * 双手握持 → 悬浮 Tab 保持当前固定宽度并居中；
-   * 单手握持 → HDS 悬浮栏自适应收窄并跟随握持侧（直接属性热更新，质感与双手模式一致）。
+   * 订阅智感握姿（握持姿态变化）——始终使用系统 HDS 悬浮栏，顺序/宽度固定：
+   * 双手/未知握持 → adaptToHandedness 关闭（居中）；
+   * 单手握持 → 启用系统原生 adaptToHandedness（支持的系统上悬浮栏自动贴近握持侧，
+   * 本机系统无左右手设置时保持居中，不影响任何切换）。
    * 需要 ohos.permission.DETECT_GESTURE（normal 级 system_grant，安装时自动授予）。
    */
   private initGripListener(): void {
@@ -604,8 +606,8 @@ export struct HomePage {
 
   /** 内容底部呼吸间距（vp） */
   private getContentBottomInset(): number {
-    if (!this.supportImmersiveTabs || this.gripSide !== 0) {
-      // 自绘跟手悬浮栏分支（含单手握持切换）：内容延伸到悬浮栏下方，需要较大避让
+    if (!this.supportImmersiveTabs) {
+      // 手绘悬浮胶囊分支：内容延伸到悬浮胶囊下方，需要较大避让
       return 88;
     }
     // 官方 HDS 分支：避让由页面内部的底部 spacer 完成（见 settingPage/toolList），
@@ -613,23 +615,29 @@ export struct HomePage {
     return 16;
   }
 
-  /** Tab 点击统一处理：切换 + 设置页连点彩蛋 */
+  /** Tab 点击统一处理：切换 + 设置页连点彩蛋（用于旧系统手绘胶囊等非 HDS 分支） */
   private handleTabClick(index: number): void {
     this.currentIndex = index;
-    if (index === SETTING_TAB_INDEX) {
-      let now: number = Date.now();
-      if (now - this.lastSettingsClickTime > this.CLICK_WINDOW_MS) {
-        this.settingsClickCount = 0;
-      }
-      this.lastSettingsClickTime = now;
-      this.settingsClickCount++;
-      if (this.settingsClickCount >= this.REQUIRED_CLICKS) {
-        PreferencesUtil.put(SpKeys.ENABLE_SCAN_PARSE, true);
-        PreferencesUtil.put(SpKeys.ENABLE_HDC_VISIBLE, true);
-        this.isHdcVisible = true;
-        promptAction.showToast({ message: '扫码解析 + HDC调试功能已启用', duration: 1500 });
-        this.settingsClickCount = 0;
-      }
+    this.handleSettingsEasterEgg(index);
+  }
+
+  /** 设置页连点彩蛋：不修改 currentIndex（供 HDS 分支的 onTabBarClick 单独调用，避免映射竞态） */
+  private handleSettingsEasterEgg(index: number): void {
+    if (index !== SETTING_TAB_INDEX) {
+      return;
+    }
+    let now: number = Date.now();
+    if (now - this.lastSettingsClickTime > this.CLICK_WINDOW_MS) {
+      this.settingsClickCount = 0;
+    }
+    this.lastSettingsClickTime = now;
+    this.settingsClickCount++;
+    if (this.settingsClickCount >= this.REQUIRED_CLICKS) {
+      PreferencesUtil.put(SpKeys.ENABLE_SCAN_PARSE, true);
+      PreferencesUtil.put(SpKeys.ENABLE_HDC_VISIBLE, true);
+      this.isHdcVisible = true;
+      promptAction.showToast({ message: '扫码解析 + HDC调试功能已启用', duration: 1500 });
+      this.settingsClickCount = 0;
     }
   }
 
@@ -686,26 +694,24 @@ export struct HomePage {
       .height(0)
   }
 
-  /** 沉浸光感悬浮导航胶囊：不贴底、圆角毛玻璃材质。
-   *  双手/未知握持：整行胶囊铺满底部（历史行为）；
-   *  单手握持：收窄为自适应内容宽度，贴近握持侧（由外层 Stack 的 alignContent 定位）。 */
+  /** 沉浸光感悬浮导航胶囊：不贴底、左右留白、圆角毛玻璃材质 */
   @Builder
   floatingNavBar() {
     Row() {
-      this.floatingTabItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings'), $r('app.media.settings'), this.gripSide !== 0)
-      this.floatingTabItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting'), $r('app.media.globalSetting'), this.gripSide !== 0)
+      this.floatingTabItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings'), $r('app.media.settings'))
+      this.floatingTabItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting'), $r('app.media.globalSetting'))
     }
-    .width(this.gripSide === 0 ? '100%' : 'auto')
+    .width('100%')
     .padding(6)
     .borderRadius(32)
-    // 系统模糊材质层（与 HDS 悬浮栏同一渲染管线：真实毛玻璃 + 材质着色）
+    // 系统模糊材质层
     .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
-    // 表面光感渐变（左上光源 -> 右下微暗角，与主页卡片/HDS 同一光感配方）
+    // 表面光感渐变（左上光源 -> 右下微暗角，与主页卡片同一光感配方）
     .linearGradient({
       angle: 135,
       colors: ImmersiveStyles.cardSurfaceColors(this.isDark)
     })
-    // 点光源光效（官方视觉特效，照亮边缘，与 HDS 悬浮栏一致）
+    // 点光源光效（官方视觉特效，照亮边缘）
     .visualEffect(LightSense.lightVisualEffect())
     // 外边缘受光（非对称 rim light，模拟折射衰减）
     .border({ width: 1, color: ImmersiveStyles.cardOuterRim(this.isDark) })
@@ -716,16 +722,11 @@ export struct HomePage {
       offsetX: 0,
       offsetY: 8
     })
-    .margin({
-      // 单手握持时贴近握持侧（减少该侧留白），双手/未知时左右对称
-      left: this.gripSide === 1 ? 8 : 16,
-      right: this.gripSide === 2 ? 8 : 16,
-      bottom: '12vp'
-    })
+    .margin({ left: 16, right: 16, bottom: '12vp' })
   }
 
   @Builder
-  floatingTabItem(index: number, title: Resource, selectedImg: Resource, normalImg: Resource, compact: boolean = false) {
+  floatingTabItem(index: number, title: Resource, selectedImg: Resource, normalImg: Resource) {
     Column({ space: 2 }) {
       Image(this.currentIndex === index ? selectedImg : normalImg)
         .width(this.currentIndex === index ? 24 : 22)
@@ -739,11 +740,7 @@ export struct HomePage {
         .fontWeight(this.currentIndex === index ? FontWeight.Bold : FontWeight.Normal)
         .animation({ duration: 200 })
     }
-    // 单手模式（compact）：条目按内容自适应宽度；双手模式：均分整行宽度
-    .layoutWeight(compact ? 0 : 1)
-    .padding({ left: compact ? 12 : 0, right: compact ? 12 : 0 })
-    // 单手模式固定条目最小宽度：两个 Tab 宽度一致，选中态胶囊形状统一（避免圆/椭圆不一致）
-    .constraintSize({ minWidth: compact ? 80 : 0 })
+    .layoutWeight(1)
     .height(52)
     .justifyContent(FlexAlign.Center)
     .borderRadius(26)
@@ -777,7 +774,11 @@ export struct HomePage {
     .backgroundColor(this.wallpaperPath === '' ? $r('sys.color.background_secondary') : Color.Transparent)
   }
 
-  /** 官方 HDS 沉浸光感悬浮 Tab（系统版本 >= 6.1.0 / API 23） */
+  /**
+   * 官方 HDS 沉浸光感悬浮 Tab（系统版本 >= 6.1.0 / API 23）——始终使用系统组件。
+   * 顺序固定 [工具箱][设置]（不换序、不重排，保证点击/滑动切换可靠）；
+   * 单手握持仅启用系统原生 adaptToHandedness（支持的系统上悬浮栏自动贴近握持侧）。
+   */
   @Builder
   hdsTabsContent() {
     HdsTabs({
@@ -801,15 +802,13 @@ export struct HomePage {
     .barOverlap(true)
     // 透明化 Tab 栏背景，避免悬浮栏容器在胶囊下方/周围渲染出白色底带
     .barBackgroundColor(Color.Transparent)
-    // 悬浮栏布局：直接属性（随握持姿态/光感 @Local 变化热更新，无需重建组件）
+    // 悬浮栏布局：直接属性（随光感/握姿 @Local 变化热更新）
     .vertical(false)
     .barPosition(BarPosition.End)
     .barHeight(56)
     .barFloatingStyle(this.currentBarStyle())
-    // 握姿变化时更换 key 强制重建 HdsTabs：确保 barFloatingStyle 在挂载时完整生效
-    // （adaptToHandedness 贴边方向仅在挂载时应用，热更新只更新宽度）
-    .key(this.gripSide === 0 ? 'hds_both_hands' : 'hds_one_hand')
     .onTabBarClick((index: number) => {
+      // HdsTabs 自身处理点击切换，这里仅同步状态与连点彩蛋
       this.handleTabClick(index);
     })
     .onChange((index: number) => {
@@ -817,13 +816,10 @@ export struct HomePage {
     })
   }
 
-  /** 降级方案：手绘悬浮胶囊（旧系统版本）。单手握持时自适应宽度并贴近握持侧 */
+  /** 降级方案：手绘悬浮胶囊（旧系统版本，无 HDS 系统悬浮栏可用） */
   @Builder
   legacyTabsContent() {
-    Stack({
-      alignContent: this.gripSide === 1 ? Alignment.BottomStart :
-        (this.gripSide === 2 ? Alignment.BottomEnd : Alignment.Bottom)
-    }) {
+    Stack({ alignContent: Alignment.Bottom }) {
       Tabs({
         barPosition: BarPosition.End,
         controller: this.tabsController
@@ -1204,10 +1200,9 @@ export struct HomePage {
           .objectFit(ImageFit.Cover)
           .blur(WallpaperUtil.blurRadius(this.wallpaperBlur))
       }
-      // 官方 HDS 沉浸光感 Tab（系统 6.1.0+）：双手/未知握持使用 HDS 悬浮栏（固定宽度居中，
-      // 系统光感材质）；单手握持切换为应用自绘的跟手悬浮栏（系统模糊材质 + 点光源光效，
-      // 按握持侧精确贴边）——HDS 悬浮栏位置由组件内部硬编码居中，无左右贴边能力
-      if (this.supportImmersiveTabs && this.gripSide === 0) {
+      // 官方 HDS 沉浸光感 Tab（系统 6.1.0+）：始终使用系统悬浮栏（顺序/宽度固定，
+      // 单手握持启用系统原生 adaptToHandedness）；旧系统降级为手绘悬浮胶囊
+      if (this.supportImmersiveTabs) {
         this.hdsTabsContent()
       } else {
         this.legacyTabsContent()
@@ -1339,7 +1334,7 @@ export struct HomePage {
         left: 12,
         right: 12,
         top: 12,
-        bottom: (this.supportImmersiveTabs && this.gripSide === 0) ? 116 : 12
+        bottom: this.supportImmersiveTabs ? 116 : 12
       })
       .edgeEffect(EdgeEffect.Spring)
       // [Pad大屏适配]
