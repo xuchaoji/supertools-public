@@ -19,4 +19,6 @@ export class SpKeys {
   public static readonly H5_HISTORY: string = 'h5_history';
   /** App Linking 解析/拉起历史（JSON 数组，[LinkHistoryItem]） */
   public static readonly APP_LINKING_HISTORY: string = 'app_linking_history';
+  /** App Linking 拉起方式：true=openLink（App Linking/深链官方入口），false=startAbility(viewData) */
+  public static readonly APP_LINK_LAUNCH_MODE: string = 'app_link_launch_mode';
 }

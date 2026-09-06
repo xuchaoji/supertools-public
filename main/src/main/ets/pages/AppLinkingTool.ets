@@ -30,6 +30,8 @@ export struct AppLinkingTool {
   @State isScanVisible: boolean = false;
   /** 解析/拉起历史（最新在前，持久化于 SpKeys.APP_LINKING_HISTORY） */
   @State historyList: LinkHistoryItem[] = [];
+  /** 拉起方式：true=openLink（App Linking/深链官方入口）；false=startAbility(viewData 传统拉起） */
+  @State launchViaOpenLink: boolean = true;
 
   private xCompController: XComponentController = new XComponentController();
   private surfaceId: string = '';
@@ -40,6 +42,7 @@ export struct AppLinkingTool {
 
   aboutToAppear(): void {
     this.historyList = LinkHistoryUtil.load(SpKeys.APP_LINKING_HISTORY);
+    this.launchViaOpenLink = PreferencesUtil.getBooleanSync(SpKeys.APP_LINK_LAUNCH_MODE, true);
     this.isScanVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_SCAN_PARSE, false);
     let storedResult: string | undefined = AppStorage.get<string>('appLinkingScannedUrl');
     if (storedResult && storedResult.length > 0) {
@@ -155,18 +158,31 @@ export struct AppLinkingTool {
         return;
       }
 
-      let want: Want = {
-        action: 'ohos.want.action.viewData',
-        uri: url
-      };
-
-      await context.startAbility(want);
-      promptAction.showToast({ message: '已发起跳转', duration: 1500 });
+      if (this.launchViaOpenLink) {
+        // openLink：App Linking / DeepLink 官方入口，由系统按链接校验与分发
+        await context.openLink(url);
+        promptAction.showToast({ message: '已通过 openLink 发起跳转', duration: 1500 });
+      } else {
+        let want: Want = {
+          action: 'ohos.want.action.viewData',
+          uri: url
+        };
+        await context.startAbility(want);
+        promptAction.showToast({ message: '已发起跳转', duration: 1500 });
+      }
       this.saveHistory(url);
     } catch (err) {
       let error: BusinessError = err as BusinessError;
+      let msg: string = error.message || '未知错误';
+      if (this.launchViaOpenLink) {
+        if (error.code === 16000019 || error.code === 16000001) {
+          msg = '未找到可处理该链接的应用（无匹配 DeepLink / App Linking）';
+        } else if (error.code === 16000136) {
+          msg = '系统禁止通过 App Linking 拉起自身应用';
+        }
+      }
       promptAction.showToast({
-        message: '跳转失败: ' + (error.message || '未知错误'),
+        message: '跳转失败: ' + msg,
         duration: 2500
       });
     }
@@ -444,6 +460,50 @@ export struct AppLinkingTool {
         .padding({ left: 16, right: 16 })
       }
       .width('100%')
+
+      // ---------- 拉起方式开关（openLink / startAbility） ----------
+      Row() {
+        Column({ space: 2 }) {
+          Row() {
+            Text('拉起方式')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor($r('sys.color.font_primary'))
+            Text(this.launchViaOpenLink ? 'openLink' : 'startAbility')
+              .fontSize(11)
+              .fontColor($r('sys.color.font_secondary'))
+              .fontFamily('monospace')
+              .margin({ left: 8 })
+              .padding({ left: 6, right: 6, top: 1, bottom: 1 })
+              .backgroundColor($r('sys.color.comp_background_gray'))
+              .borderRadius(4)
+          }
+
+          Text(this.launchViaOpenLink
+            ? 'App Linking/深链官方入口：按系统链接校验直达注册应用，无匹配时精准报错'
+            : '传统 viewData 拉起：通用 URI 分发（自定义 scheme / 系统浏览器）')
+            .fontSize(11)
+            .fontColor($r('sys.color.font_secondary'))
+            .maxLines(2)
+            .lineHeight(15)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ right: 12 })
+
+        Toggle({ type: ToggleType.Switch, isOn: this.launchViaOpenLink })
+          .onChange((isOn: boolean) => {
+            this.launchViaOpenLink = isOn;
+            try {
+              PreferencesUtil.putSync(SpKeys.APP_LINK_LAUNCH_MODE, isOn);
+            } catch (e) {
+              console.error(`[${TAG}] save launch mode failed: ${JSON.stringify(e)}`);
+            }
+          })
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 14 })
+      .alignItems(VerticalAlign.Center)
 
       Divider()
         .color($r('sys.color.comp_background_emphasize'))
