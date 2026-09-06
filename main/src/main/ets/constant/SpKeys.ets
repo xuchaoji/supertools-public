@@ -15,4 +15,8 @@ export class SpKeys {
   public static readonly LIGHT_SENSE: string = 'light_sense';
   /** 二维码生成历史（JSON 数组，[QrHistoryItem]） */
   public static readonly QR_HISTORY: string = 'qr_history';
+  /** H5 页面打开历史（JSON 数组，[LinkHistoryItem]） */
+  public static readonly H5_HISTORY: string = 'h5_history';
+  /** App Linking 解析/拉起历史（JSON 数组，[LinkHistoryItem]） */
+  public static readonly APP_LINKING_HISTORY: string = 'app_linking_history';
 }

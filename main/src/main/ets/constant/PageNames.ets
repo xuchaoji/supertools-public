@@ -1,4 +1,4 @@
-﻿export class PageNames {
+export class PageNames {
   public static readonly GUIDE_PAGE: string = 'guidePage';
   public static readonly PRIVACY_PAGE: string = 'privacyPage';
   public static readonly SPLASH_PAGE: string = 'splashPage';
@@ -9,6 +9,7 @@
   public static readonly LOCAL_WEB_PAGE = 'localWebPage';
   public static readonly DEVICE_INFO_PAGE = 'deviceInfoPage';
   public static readonly APP_LINKING_TOOL = 'appLinkingTool';
+  public static readonly H5_PAGE = 'h5Page';
   public static readonly HDC_DEBUG_PAGE = 'hdcDebugPage';
   public static readonly QR_CODE_PAGE = 'qrCodePage';
 }

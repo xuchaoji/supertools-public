@@ -81,6 +81,14 @@ export struct HomePage {
       }
     },
     {
+      name: 'H5 页面打开',
+      desc: '应用内打开 H5 / https 链接',
+      icon: $r('app.media.h5_page'),
+      onClick: (event: ClickEvent) => {
+        HMRouterMgr.push({ pageUrl: PageNames.H5_PAGE })
+      }
+    },
+    {
       name: '录屏',
       desc: '高清无压缩录屏功能',
       icon: $r('app.media.recorder'),

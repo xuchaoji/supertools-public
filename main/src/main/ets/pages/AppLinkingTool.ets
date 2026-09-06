@@ -10,6 +10,7 @@ import { camera } from '@kit.CameraKit';
 import { display } from '@kit.ArkUI';
 import { PreferencesUtil } from '@pura/harmony-utils';
 import { SpKeys } from '../constant/SpKeys';
+import { LinkHistoryUtil, LinkHistoryItem } from '../utils/UrlHistoryUtil';
 import { WallpaperHost } from '../components/WallpaperHost';
 
 interface ScanViewControl {
@@ -27,6 +28,8 @@ export struct AppLinkingTool {
   @State parsedResult: ParsedURLResult = URLParserUtil.parse('');
   @State isScanning: boolean = false;
   @State isScanVisible: boolean = false;
+  /** 解析/拉起历史（最新在前，持久化于 SpKeys.APP_LINKING_HISTORY） */
+  @State historyList: LinkHistoryItem[] = [];
 
   private xCompController: XComponentController = new XComponentController();
   private surfaceId: string = '';
@@ -36,6 +39,7 @@ export struct AppLinkingTool {
   private isResourcesReady: boolean = false;
 
   aboutToAppear(): void {
+    this.historyList = LinkHistoryUtil.load(SpKeys.APP_LINKING_HISTORY);
     this.isScanVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_SCAN_PARSE, false);
     let storedResult: string | undefined = AppStorage.get<string>('appLinkingScannedUrl');
     if (storedResult && storedResult.length > 0) {
@@ -92,12 +96,42 @@ export struct AppLinkingTool {
     this.parsedResult = URLParserUtil.parse(this.inputUrl);
     if (!this.parsedResult.valid && this.inputUrl.trim().length > 0) {
       promptAction.showToast({ message: this.parsedResult.errorMessage || '无效的链接格式', duration: 1500 });
+    } else if (this.parsedResult.valid) {
+      this.saveHistory(this.inputUrl.trim());
     }
   }
 
   private clearInput(): void {
     this.inputUrl = '';
     this.parsedResult = URLParserUtil.parse('');
+  }
+
+  /** 记录历史（最新在前、去重、上限 30） */
+  private saveHistory(text: string): void {
+    this.historyList = LinkHistoryUtil.add(this.historyList, text);
+    LinkHistoryUtil.persist(SpKeys.APP_LINKING_HISTORY, this.historyList);
+  }
+
+  /** 历史：删除单条 */
+  private removeHistory(index: number): void {
+    if (index < 0 || index >= this.historyList.length) {
+      return;
+    }
+    this.historyList = LinkHistoryUtil.remove(this.historyList, index);
+    LinkHistoryUtil.persist(SpKeys.APP_LINKING_HISTORY, this.historyList);
+  }
+
+  /** 历史：清空 */
+  private clearHistory(): void {
+    this.historyList = [];
+    LinkHistoryUtil.persist(SpKeys.APP_LINKING_HISTORY, []);
+    promptAction.showToast({ message: '历史已清空', duration: 1000 });
+  }
+
+  /** 历史：点击回填输入框并解析 */
+  private useHistoryItem(item: LinkHistoryItem): void {
+    this.inputUrl = item.text;
+    this.doParse();
   }
 
   private async launchDeepLink(): Promise<void> {
@@ -128,6 +162,7 @@ export struct AppLinkingTool {
 
       await context.startAbility(want);
       promptAction.showToast({ message: '已发起跳转', duration: 1500 });
+      this.saveHistory(url);
     } catch (err) {
       let error: BusinessError = err as BusinessError;
       promptAction.showToast({
@@ -414,44 +449,117 @@ export struct AppLinkingTool {
         .color($r('sys.color.comp_background_emphasize'))
         .margin({ top: 12, left: 16, right: 16 })
 
-      if (this.parsedResult.valid) {
-        Scroll() {
-          Column({ space: 12 }) {
+      // 下部区域：解析结果 / 提示 + 历史记录，整体可滚动
+      Scroll() {
+        Column({ space: 12 }) {
+          if (this.parsedResult.valid) {
             this.BasicInfoCard()
             this.QueryParamsCard()
             if (this.parsedResult.deepLink) {
               this.DeepLinkCard()
             }
-          }
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 12, bottom: 24 })
-        }
-        .scrollBar(BarState.Auto)
-        .layoutWeight(1)
-        .width('100%')
-      } else {
-        Column() {
-          if (this.inputUrl.trim().length > 0 && this.parsedResult.errorMessage.length > 0) {
-            Text(this.parsedResult.errorMessage)
-              .fontSize(14)
-              .fontColor($r('sys.color.font_emphasize'))
-              .fontFamily('monospace')
           } else {
-            Text('输入链接后点击「解析」查看拆解结果')
-              .fontSize(13)
-              .fontColor($r('sys.color.font_secondary'))
-              .opacity(0.5)
+            Column() {
+              if (this.inputUrl.trim().length > 0 && this.parsedResult.errorMessage.length > 0) {
+                Text(this.parsedResult.errorMessage)
+                  .fontSize(14)
+                  .fontColor($r('sys.color.font_emphasize'))
+                  .fontFamily('monospace')
+              } else {
+                Text('输入链接后点击「解析」查看拆解结果，或用「测试拉起」发起跳转')
+                  .fontSize(13)
+                  .fontColor($r('sys.color.font_secondary'))
+                  .opacity(0.5)
+              }
+            }
+            .width('100%')
+            .constraintSize({ minHeight: '200vp' })
+            .justifyContent(FlexAlign.Center)
+            .alignItems(HorizontalAlign.Center)
+          }
+
+          // ---------- 历史记录 ----------
+          if (this.historyList.length > 0) {
+            this.HistorySection()
           }
         }
         .width('100%')
-        .layoutWeight(1)
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
+        .padding({ left: 16, right: 16, top: 12, bottom: 24 })
       }
+      .scrollBar(BarState.Auto)
+      .layoutWeight(1)
+      .width('100%')
     }
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
+  }
+
+  @Builder
+  HistorySection() {
+    Column() {
+      Row() {
+        Circle({ width: 8, height: 8 })
+          .fill($r('sys.color.comp_foreground_primary'))
+        Text('历史记录')
+          .fontSize(15)
+          .fontWeight(FontWeight.Bold)
+          .fontColor($r('sys.color.font_emphasize'))
+          .margin({ left: 6 })
+        Text(`(${this.historyList.length})`)
+          .fontSize(11)
+          .fontColor($r('sys.color.font_secondary'))
+          .fontFamily('monospace')
+          .margin({ left: 4 })
+        Blank()
+        Text('清空')
+          .fontSize(11)
+          .fontColor($r('sys.color.font_secondary'))
+          .fontFamily('monospace')
+          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+          .border({ width: 1, color: $r('sys.color.comp_background_emphasize'), style: BorderStyle.Dashed })
+          .borderRadius(4)
+          .onClick(() => this.clearHistory())
+      }
+      .width('100%')
+      .padding({ bottom: 6 })
+
+      ForEach(this.historyList, (item: LinkHistoryItem, index: number) => {
+        Row() {
+          Text(LinkHistoryUtil.formatTime(item.ts))
+            .fontSize(10)
+            .fontColor($r('sys.color.font_secondary'))
+            .fontFamily('monospace')
+            .constraintSize({ minWidth: 44 })
+          Text(item.text)
+            .fontSize(12)
+            .fontColor($r('sys.color.font_primary'))
+            .fontFamily('monospace')
+            .maxLines(1)
+            .ellipsisMode(EllipsisMode.END)
+            .layoutWeight(1)
+            .margin({ left: 8, right: 8 })
+          Text('✕')
+            .fontSize(11)
+            .fontColor($r('sys.color.font_secondary'))
+            .padding({ left: 7, right: 7, top: 2, bottom: 2 })
+            .borderRadius(4)
+            .backgroundColor('rgba(128, 128, 128, 0.15)')
+            .onClick(() => this.removeHistory(index))
+        }
+        .width('100%')
+        .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+        .borderRadius(8)
+        .backgroundColor('rgba(128, 128, 128, 0.10)')
+        // 点击历史：回填输入框并解析
+        .onClick(() => this.useHistoryItem(item))
+      }, (item: LinkHistoryItem, index: number) => item.ts.toString() + '_' + index.toString())
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor($r('sys.color.background_secondary'))
+    .borderRadius(10)
+    .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
   }
 
   @Builder
