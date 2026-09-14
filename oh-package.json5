@@ -5,7 +5,8 @@
     "@hadss/hmrouter": "^1.2.0-beta.0",
     "@hadss/hmrouter-transitions": "^1.2.0-beta.0",
     "@pura/harmony-utils": "^1.3.6",
-    "@pura/picker_utils": "^1.0.1"
+    "@pura/picker_utils": "^1.0.1",
+    "@hw-ads/ads": "8.4.90-313.3"
   },
   "devDependencies": {
     "@ohos/hypium": "1.0.21",

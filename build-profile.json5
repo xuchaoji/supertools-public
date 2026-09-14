@@ -5,26 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "0000001BBD2D8280E638C4A218A10097E14DBD0D78B31B2D64406581C24F44D853B0BE55A23B0EE5C4682B",
-          "profile": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
+          "storeFile": "D:/dev/devEcoWkSpace/supertools-public/sign/supertools.p12",
+          "storePassword": "00000019DD72FB26037C821BAC415776A961DD8E1C07B5E35BC9030369823C2D544BAF9246C8D79368",
+          "keyAlias": "supertools",
+          "keyPassword": "000000190262FC8BC1D38F8A0B5D2CE15CDCCB5B2C6CFDDA390264C345D7678FDB28E6A05233A7113B",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
-          "storePassword": "0000001BBE222E9A6C3CEE26B39AACE6A0613F9B07573B024FB6672C78DC04F6D47EEA1424325F7E02363B"
-        }
-      },
-      {
-        "name": "dev",
-        "type": "HarmonyOS",
-        "material": {
-          "certpath": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "0000001B78A9F4D7BB9285070FE0D664144D3F0E6E9BE90C0DB182D269294D677B71603C5582F610EE3BBF",
-          "profile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
-          "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
-          "storePassword": "0000001BE03E9D53F6B16A8D4C02977A3277234A43F832A3EA0CA5A938F8168F41E3BD59B301CB85C380C1"
+          "profile": "D:/dev/devEcoWkSpace/supertools-public/sign/supertoolsRelease.p7b",
+          "certpath": "D:/dev/devEcoWkSpace/supertools-public/sign/supertools.cer"
         }
       }
     ],
@@ -35,23 +22,6 @@
         "targetSdkVersion": "5.0.5(17)",
         "compatibleSdkVersion": "5.0.5(17)",
         "runtimeOS": "HarmonyOS",
-        "bundleName": "com.xuchaoji.hmos.supertools.dev",
-        "label": "$string:app_name",
-        "buildOption": {
-          "strictMode": {
-            "caseSensitiveCheck": true,
-            "useNormalizedOHMUrl": true
-          }
-        }
-      },
-      {
-        "name": "dev",
-        "signingConfig": "dev",
-        "targetSdkVersion": "5.0.5(17)",
-        "compatibleSdkVersion": "5.0.5(17)",
-        "runtimeOS": "HarmonyOS",
-        "bundleName": "com.xuchaoji.hmos.supertools.dev",
-        "label": "$string:app_name_dev",
         "buildOption": {
           "strictMode": {
             "caseSensitiveCheck": true,
@@ -75,15 +45,9 @@
       "srcPath": "./main",
       "targets": [
         {
-          "name": "product",
+          "name": "default",
           "applyToProducts": [
             "default"
-          ]
-        },
-        {
-          "name": "dev",
-          "applyToProducts": [
-            "dev"
           ]
         }
       ]
