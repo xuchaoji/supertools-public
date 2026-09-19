@@ -10,6 +10,7 @@ import { WebServerUtil } from '../utils/WebServerUtil';
 import { FloatWindowUtil } from '../utils/FloatWindowUtil';
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
 import { TargetConstants } from 'main/ets/TargetConstants';
+import { AdManager } from '../utils/AdManager';
 
 const TAG: string = 'PrivacyPage';
 
@@ -37,12 +38,31 @@ export struct PrivacyPage {
   // 保存用户选择
   private saveUserAgreement(agreed: boolean) {
     try {
-      PreferencesUtil.put(SpKeys.PRIVACY_AGREE, agreed)
+      // 用同步写入：同意状态需立即可读（后续的广告 SDK 初始化、服务自启动恢复都同步读取该值）
+      PreferencesUtil.putSync(SpKeys.PRIVACY_AGREE, agreed)
       if (agreed) {
         this.startDefaultServices();
       }
     } catch (err) {
       console.error('保存用户选择失败:', JSON.stringify(err));
+    }
+  }
+
+  /**
+   * 同意隐私政策后初始化广告 SDK 并展示开屏广告。
+   * 广告 SDK 必须在用户同意隐私政策之后才能初始化（合规要求），
+   * 因此这里是「首次启动」场景下的广告初始化入口（冷启动场景在 MainAbility 中处理）。
+   */
+  private initAdsAndSplash(): void {
+    try {
+      const ctx = GlobalContextHolder.getInstance().uiAbilityContext;
+      if (!ctx) {
+        console.error('[PrivacyPage] context unavailable, skip ad init');
+        return;
+      }
+      AdManager.getInstance().initAndShowSplashIfNeeded(ctx);
+    } catch (e) {
+      console.error('[PrivacyPage] initAdsAndSplash failed:', JSON.stringify(e));
     }
   }
 
@@ -156,6 +176,8 @@ export struct PrivacyPage {
           .margin({ left: 20 })
           .onClick(() => {
             this.saveUserAgreement(true);
+            // 同意隐私政策之后再初始化广告 SDK 并展示开屏广告
+            this.initAdsAndSplash();
             // 跳转到主页面
             HMRouterMgr.replace({
               pageUrl: PageNames.HOME_PAGE

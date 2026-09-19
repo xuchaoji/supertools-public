@@ -2,6 +2,7 @@ import { hdsEffect, hdsMaterial } from '@kit.UIDesignKit';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { PreferencesUtil } from '@pura/harmony-utils';
 import { SpKeys } from '../constant/SpKeys';
+import { TargetConstants } from 'main/ets/TargetConstants';
 
 /**
  * 全局光感档位（沉浸光感强度统一控制）。
@@ -12,6 +13,9 @@ import { SpKeys } from '../constant/SpKeys';
  *
  * 持久化：SpKeys.LIGHT_SENSE；内存同步：AppStorage['LightSense']。
  * 能力降级：6.0(API 20) 起支持 hdsEffect；更低版本自动回退为 backgroundBlurStyle + 透明度（现状兜底）。
+ *
+ * 「精致」档解锁：启用广告的产物（TargetConstants.AD_ENABLED）中，「精致」档需通过激励广告解锁，
+ * 未解锁时最高只能选到「标准」档；解锁状态仅当次运行有效（不持久化，重启后需重新观看）。
  */
 export class LightSense {
   static readonly LEVEL_OFF: number = 0;
@@ -20,18 +24,44 @@ export class LightSense {
   static readonly LEVEL_EXQUISITE: number = 3;
   static readonly LEVEL_NAMES: Array<string> = ['关闭', '柔和', '标准', '精致'];
 
-  /** 读取当前档位（持久化，默认精致） */
-  static getLevel(): number {
-    try {
-      return PreferencesUtil.getNumberSync(SpKeys.LIGHT_SENSE, LightSense.LEVEL_EXQUISITE);
-    } catch (e) {
-      return LightSense.LEVEL_EXQUISITE;
+  /** 「精致」档是否已通过激励广告解锁（仅内存，进程内有效） */
+  private static exquisiteUnlocked: boolean = false;
+
+  /** 「精致」档是否已解锁 */
+  static isExquisiteUnlocked(): boolean {
+    return LightSense.exquisiteUnlocked;
+  }
+
+  /** 激励广告看完后解锁「精致」档（仅当次运行有效） */
+  static unlockExquisite(): void {
+    LightSense.exquisiteUnlocked = true;
+  }
+
+  /**
+   * 当前可选最高档位：
+   * 启用广告且未解锁时最高为「标准」档，其余情况（未启用广告 / 已解锁）为「精致」档。
+   */
+  static maxSelectableLevel(): number {
+    if (TargetConstants.AD_ENABLED && !LightSense.exquisiteUnlocked) {
+      return LightSense.LEVEL_SMOOTH;
     }
+    return LightSense.LEVEL_EXQUISITE;
+  }
+
+  /** 读取当前档位（持久化，默认精致；受「精致」档解锁状态限制上限） */
+  static getLevel(): number {
+    let level: number = LightSense.LEVEL_EXQUISITE;
+    try {
+      level = PreferencesUtil.getNumberSync(SpKeys.LIGHT_SENSE, LightSense.LEVEL_EXQUISITE);
+    } catch (e) {
+      level = LightSense.LEVEL_EXQUISITE;
+    }
+    return Math.min(Math.max(Math.round(level), 0), LightSense.maxSelectableLevel());
   }
 
   /** 设置档位：持久化 + AppStorage 广播（Index/WallpaperHost 等 V1 组件可响应） */
   static setLevel(value: number): void {
-    const level = Math.min(Math.max(Math.round(value), 0), 3);
+    const level = Math.min(Math.max(Math.round(value), 0), LightSense.maxSelectableLevel());
     try {
       PreferencesUtil.putSync(SpKeys.LIGHT_SENSE, level);
     } catch (e) {

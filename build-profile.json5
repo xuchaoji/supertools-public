@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "storeFile": "D:/dev/devEcoWkSpace/supertools-public/sign/supertools.p12",
-          "storePassword": "00000019DD72FB26037C821BAC415776A961DD8E1C07B5E35BC9030369823C2D544BAF9246C8D79368",
-          "keyAlias": "supertools",
-          "keyPassword": "000000190262FC8BC1D38F8A0B5D2CE15CDCCB5B2C6CFDDA390264C345D7678FDB28E6A05233A7113B",
+          "certpath": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001BEB5456BFE533D65273089C537CBC29C70807A6A401337C19884CB4FECC5C3C2B9219C153B4E0B9",
+          "profile": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
           "signAlg": "SHA256withECDSA",
-          "profile": "D:/dev/devEcoWkSpace/supertools-public/sign/supertoolsRelease.p7b",
-          "certpath": "D:/dev/devEcoWkSpace/supertools-public/sign/supertools.cer"
+          "storeFile": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
+          "storePassword": "0000001B05F0221896326740171B4750FE53A80F8B6C6528EC5C450B60691A533A904FB8E547BADA2E0DD7"
         }
       }
     ],

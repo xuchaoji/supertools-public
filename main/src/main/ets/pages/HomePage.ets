@@ -1,4 +1,4 @@
-import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
+import { HMLifecycle, HMRouter, HMRouterMgr, IHMLifecycle, HMLifecycleContext } from "@hadss/hmrouter";
 import { PageNames } from "../constant/PageNames";
 import { SpKeys } from "../constant/SpKeys";
 import { DragCardModel, ToolCardItem } from "../model/HomePageModel";
@@ -28,6 +28,9 @@ import { StressFloatWindowManager } from "../capabilities/floatingstress/StressW
 import { TargetConstants } from "main/ets/TargetConstants";
 import { WebServerUtil } from "../utils/WebServerUtil";
 import { FloatWindowUtil } from "../utils/FloatWindowUtil";
+import { AdManager } from "../utils/AdManager";
+import { BannerAdView } from "../components/BannerAdView";
+import { NativeAdView } from "../components/NativeAdView";
 
 const TAG: string = 'HOME_PAGE';
 
@@ -43,7 +46,7 @@ interface CropCanvasSize {
   ch: number;
 }
 
-@HMRouter({ pageUrl: PageNames.HOME_PAGE })
+@HMRouter({ pageUrl: PageNames.HOME_PAGE, lifecycle: 'HomePageLifecycle' })
 @ComponentV2
 export struct HomePage {
   @Local currentIndex: number = 0;
@@ -58,6 +61,8 @@ export struct HomePage {
   @Local wallpaperBlur: number = 0;
   /** 全局光感档位（0=关闭 1=柔和 2=标准 3=精致），驱动 Tab 材质/卡片毛玻璃/点光源 */
   @Local lightSense: number = LightSense.LEVEL_EXQUISITE;
+  /** 光感「精致」档是否已通过激励广告解锁（仅当次运行有效，不持久化） */
+  @Local exquisiteUnlocked: boolean = false;
   // 官方 HDS 沉浸光感 Tab（HdsTabs + systemMaterialEffect）
   private hdsTabsController: HdsTabsController = new HdsTabsController();
   // 设备系统版本 >= 6.1.0(API 23) 才支持 HDS 沉浸材质，否则降级为手绘悬浮胶囊
@@ -77,7 +82,7 @@ export struct HomePage {
       desc: '元服务/App链接深度拆解与跳转测试',
       icon: $r('app.media.app_link'),
       onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.APP_LINKING_TOOL })
+        pushToolPage(PageNames.APP_LINKING_TOOL)
       }
     },
     {
@@ -85,7 +90,7 @@ export struct HomePage {
       desc: '应用内打开 H5 / https 链接',
       icon: $r('app.media.h5_page'),
       onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.H5_PAGE })
+        pushToolPage(PageNames.H5_PAGE)
       }
     },
     {
@@ -93,7 +98,7 @@ export struct HomePage {
       desc: '高清无压缩录屏功能',
       icon: $r('app.media.recorder'),
       onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.SCREEN_RECORD })
+        pushToolPage(PageNames.SCREEN_RECORD)
       }
     },
     {
@@ -101,7 +106,7 @@ export struct HomePage {
       desc: '构建本地静态web服务器',
       icon: $r('app.media.web_server'),
       onClick: () => {
-        HMRouterMgr.push({ pageUrl: PageNames.LOCAL_WEB_PAGE })
+        pushToolPage(PageNames.LOCAL_WEB_PAGE)
       }
     },
     {
@@ -109,7 +114,7 @@ export struct HomePage {
       desc: 'Base64、Url编解码',
       icon: $r('app.media.string_convert'),
       onClick: (event) => {
-        HMRouterMgr.push({ pageUrl: PageNames.STR_CONVERT })
+        pushToolPage(PageNames.STR_CONVERT)
       }
     }
     ,
@@ -118,7 +123,7 @@ export struct HomePage {
       desc: '文本生成二维码，支持保存相册',
       icon: $r('app.media.qr_code'),
       onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.QR_CODE_PAGE })
+        pushToolPage(PageNames.QR_CODE_PAGE)
       }
     }
     ,
@@ -127,7 +132,7 @@ export struct HomePage {
       desc: '本地 HDC 终端，直连 hdcd 调试本机',
       icon: $r('app.media.hdc_debug'),
       onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.HDC_DEBUG_PAGE })
+        pushToolPage(PageNames.HDC_DEBUG_PAGE)
       }
     }
   ];
@@ -188,7 +193,7 @@ export struct HomePage {
       desc: '系统、屏幕、电池等硬件参数',
       icon: $r('app.media.deviceinfo'),
       onClick: (event: ClickEvent) => {
-        HMRouterMgr.push({ pageUrl: PageNames.DEVICE_INFO_PAGE })
+        pushToolPage(PageNames.DEVICE_INFO_PAGE)
       }
     })
     if (TargetConstants.IS_AG_TARGET) {
@@ -197,7 +202,7 @@ export struct HomePage {
         desc: '执行计算任务模拟设备高负载场景',
         icon: $r('app.media.bench'),
         onClick: (event: ClickEvent) => {
-          HMRouterMgr.push({ pageUrl: PageNames.CALC_PAGE })
+          pushToolPage(PageNames.CALC_PAGE)
         }
       })
     }
@@ -210,6 +215,7 @@ export struct HomePage {
     // 恢复已设置的壁纸
     this.wallpaperPath = WallpaperUtil.getPath();
     this.wallpaperBlur = WallpaperUtil.getBlur();
+    this.exquisiteUnlocked = LightSense.isExquisiteUnlocked();
     this.lightSense = LightSense.getLevel();
     this.loadWallpaperPm();
   }
@@ -607,9 +613,37 @@ export struct HomePage {
 
   /** 调整全局光感档位：本地状态 + 持久化（HDS 悬浮栏材质随 @Local 重渲染自动更新，卡片毛玻璃按档位自动跟随） */
   private updateLightSense(value: number): void {
-    const v = Math.min(Math.max(Math.round(value), 0), 3);
+    // 启用广告的产物中，「精致」档需先通过激励广告解锁（未解锁时上限为「标准」档）
+    const v = Math.min(Math.max(Math.round(value), 0), LightSense.maxSelectableLevel());
     this.lightSense = v;
     LightSense.setLevel(v);
+  }
+
+  /**
+   * 看激励广告解锁光感「精致」档。
+   * 完整观看（ad.rewarded === true）后解锁，解锁状态仅当次运行有效。
+   */
+  private unlockExquisiteByAd(): void {
+    if (this.exquisiteUnlocked) {
+      return;
+    }
+    if (!LightSense.isExquisiteUnlocked() && LightSense.maxSelectableLevel() >= LightSense.LEVEL_EXQUISITE) {
+      // 未启用广告的产物：本身就不限制档位，无需看广告
+      promptAction.showToast({ message: `当前版本可直接使用「${LightSense.levelName(LightSense.LEVEL_EXQUISITE)}」档`, duration: 1500 });
+      this.exquisiteUnlocked = true;
+      return;
+    }
+    const ctx = GlobalContextHolder.getInstance().uiAbilityContext;
+    AdManager.getInstance().loadAndShowRewarded(ctx, () => {
+      LightSense.unlockExquisite();
+      this.exquisiteUnlocked = true;
+      promptAction.showToast({
+        message: `已解锁光感「${LightSense.levelName(LightSense.LEVEL_EXQUISITE)}」档`,
+        duration: 1500
+      });
+    }, (message: string) => {
+      promptAction.showToast({ message: message, duration: 1500 });
+    });
   }
 
   /** 内容底部呼吸间距（vp） */
@@ -1078,7 +1112,8 @@ export struct HomePage {
               Slider({
                 value: this.lightSense,
                 min: 0,
-                max: 3,
+                // 启用广告的产物中未解锁时最高只能选到「标准」档（「精致」档需看激励广告解锁）
+                max: LightSense.maxSelectableLevel(),
                 step: 1,
                 style: SliderStyle.OutSet
               })
@@ -1092,6 +1127,55 @@ export struct HomePage {
             .padding({ left: '16vp', right: '16vp' })
           }
         }
+        if (TargetConstants.AD_ENABLED) {
+          // ===== 高级档位（激励广告解锁）=====
+          Text('高级档位:')
+            .margin({ left: '8vp', top: '16vp' })
+            .fontSize($r('sys.float.Body_L'))
+            .fontWeight(FontWeight.Bold)
+            .fontColor($r('sys.color.font_secondary'))
+            .textShadow(ImmersiveStyles.textShadow(this.isDark))
+
+          SettingGroup() {
+            ListItem() {
+              Row({ space: 12 }) {
+                Column({ space: 2 }) {
+                  Text(`光感「${LightSense.levelName(LightSense.LEVEL_EXQUISITE)}」档`)
+                    .fontColor($r('sys.color.font_primary'))
+                    .fontSize('16vp')
+                    .fontWeight(FontWeight.Medium)
+                    // 深色/浅色模式可读性：阴影颜色与文字相反
+                    .textShadow(ImmersiveStyles.textShadow(this.isDark))
+
+                  Text(this.exquisiteUnlocked
+                    ? '已解锁：光感可调至「精致」档'
+                    : '观看一段激励广告即可解锁（重启应用后需重新解锁）')
+                    .fontSize('12vp')
+                    .fontColor($r('sys.color.font_secondary'))
+                    .maxLines(2)
+                    .textOverflow({ overflow: TextOverflow.Ellipsis })
+                    .textShadow(ImmersiveStyles.textShadow(this.isDark))
+                }
+                .layoutWeight(1)
+                .alignItems(HorizontalAlign.Start)
+
+                Button(this.exquisiteUnlocked ? '已解锁' : '看广告解锁')
+                  .height(32)
+                  .fontSize(12)
+                  .enabled(!this.exquisiteUnlocked)
+                  .onClick(() => this.unlockExquisiteByAd())
+              }
+              .width('100%')
+              .height('64vp')
+              .justifyContent(FlexAlign.SpaceBetween)
+              .padding({ left: '16vp', right: '16vp' })
+            }
+          }
+
+          // 原生广告（adType 3）：设置页底部
+          NativeAdView()
+        }
+
         if (this.supportImmersiveTabs) {
           Row()
             .height(140)
@@ -1337,21 +1421,32 @@ export struct HomePage {
       .columnsGap(8)
       .rowsGap(8)
       .columnsTemplate('1fr 1fr 1fr')
-      // 底部预留悬浮 Tab 栏避让空间（HDS 分支），最后一排卡片可滚动到悬浮栏上方
+      // 底部预留悬浮 Tab 栏避让空间（HDS 分支），最后一排卡片可滚动到悬浮栏上方；
+      // 接入横幅广告时，避让由「横幅广告 + 容器底部内边距」承担（见下方），网格自身不再重复预留
       .padding({
         left: 12,
         right: 12,
         top: 12,
-        bottom: this.supportImmersiveTabs ? 116 : 12
+        bottom: this.supportImmersiveTabs ? (TargetConstants.AD_ENABLED ? 12 : 116) : 12
       })
       .edgeEffect(EdgeEffect.Spring)
       // [Pad大屏适配]
       .constraintSize({ maxWidth: 800 })
+      // 填满横幅广告以上的剩余空间
+      .layoutWeight(1)
+
+      // 横幅广告（adType 8）：工具箱 Tab 底部、悬浮导航栏上方；未启用广告的产物不渲染
+      if (TargetConstants.AD_ENABLED) {
+        BannerAdView()
+      }
     }
     .height('100%')
     .width('100%')
-    // 悬浮 Tab 栏避让，保证最后一排卡片可滚动到悬浮栏上方
-    .padding({ bottom: this.getContentBottomInset() })
+    // 悬浮 Tab 栏避让，保证最后一排卡片可滚动到悬浮栏上方；
+    // 启用广告时该内边距同时把横幅广告抬到悬浮栏上方
+    .padding({ bottom: TargetConstants.AD_ENABLED
+      ? (this.supportImmersiveTabs ? 116 : 88)
+      : this.getContentBottomInset() })
     .align(Alignment.Center)
   }
 }
@@ -1412,4 +1507,43 @@ export function pixelMapBuilder(dragModel: DragCardModel, isDark: boolean) {
     offsetX: 0,
     offsetY: 10
   })
+}
+
+/**
+ * 「从工具页返回主页」时按频控展示插屏广告（频控/去重统一在 AdManager 内部完成）。
+ */
+function showReturnInterstitial(): void {
+  AdManager.getInstance().tryShowReturnInterstitial(GlobalContextHolder.getInstance().uiAbilityContext);
+}
+
+/**
+ * 打开工具页（主页 → 工具页 的统一入口）。
+ *
+ * 插屏广告需要在「从工具页返回主页」时展示，而 HMRouterMgr.push 的 onResult 回调
+ * 正好在该工具页被 pop（即返回主页）时触发；因此所有工具入口统一走该函数跳转，
+ * 避免在多个调用点重复写频控逻辑。
+ */
+function pushToolPage(pageUrl: string): void {
+  AdManager.getInstance().notifyToolPageOpened();
+  HMRouterMgr.push({ pageUrl: pageUrl }, {
+    onResult: () => {
+      showReturnInterstitial();
+    }
+  });
+}
+
+/**
+ * 主页生命周期（与 @HMRouter({ lifecycle: 'HomePageLifecycle' }) 绑定）。
+ * 主页重新可见（onShown）时按频控尝试展示「从工具页返回主页」插屏广告，
+ * 与 pushToolPage 的 onResult 互为兜底（AdManager 内部已做频控/去重，不会重复展示）。
+ */
+@HMLifecycle({ lifecycleName: 'HomePageLifecycle' })
+export class HomePageLifecycle implements IHMLifecycle {
+  onShown(ctx: HMLifecycleContext): void {
+    try {
+      showReturnInterstitial();
+    } catch (e) {
+      hilog.info(0x0000, TAG, 'HomePageLifecycle onShown failed');
+    }
+  }
 }

@@ -89,7 +89,7 @@
           "when": "always"
         },
       },
-      {
+      /*{
         "name": "ohos.permission.SYSTEM_FLOAT_WINDOW",
         "reason": "$string:FloatWindowPermissions_desc",
         "usedScene": {
@@ -98,7 +98,7 @@
           ],
           "when": "always"
         }
-      },
+      },*/
       {
         "name": "ohos.permission.CAMERA",
         "reason": "$string:CameraPermissions_desc",

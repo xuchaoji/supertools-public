@@ -19,6 +19,7 @@ import { StressFloatWindowManager } from '../capabilities/floatingstress/StressW
 import { WebServerUtil } from '../utils/WebServerUtil';
 import { TargetConstants } from 'main/ets/TargetConstants';
 import { HdcService } from '../utils/HdcService';
+import { AdManager } from '../utils/AdManager';
 
 const DOMAIN = 0x0000;
 
@@ -37,6 +38,20 @@ export default class MainAbility extends UIAbility {
     HMRouterMgr.init({ context: this.context })
     this.restoreSavedState();
     this.initHdcServer();
+  }
+
+  /**
+   * 广告初始化 + 开屏广告（鲸鸿动能 Ads Kit，@hw-ads/ads）。
+   * - 仅在启用广告的产物（AG 上架 product target）中生效；
+   * - 仅在用户已同意隐私政策时初始化并展示（同意前不初始化 SDK、不发起广告请求）；
+   * - 开屏广告加载超过 5s 未成功则放弃展示（见 AdManager / AdConstants）。
+   */
+  initAds(): void {
+    try {
+      AdManager.getInstance().initAndShowSplashIfNeeded(this.context);
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'initAds failed: %{public}s', JSON.stringify(e));
+    }
   }
 
   initHdcServer(): void {
@@ -141,6 +156,10 @@ export default class MainAbility extends UIAbility {
   onWindowStageCreate(windowStage: window.WindowStage): void {
     // Main window is created, set main page for this ability
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
+
+    // 广告：冷启动时初始化 SDK（仅已同意隐私政策的情况下）并尝试展示开屏广告。
+    // 必须在同意隐私政策之后才初始化，未同意时 AdManager 内部直接跳过（合规要求）。
+    this.initAds();
 
     const loadPage = (): void => {
       windowStage.loadContent('pages/Index', (err) => {
