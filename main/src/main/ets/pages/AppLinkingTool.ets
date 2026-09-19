@@ -12,6 +12,7 @@ import { PreferencesUtil } from '@pura/harmony-utils';
 import { SpKeys } from '../constant/SpKeys';
 import { LinkHistoryUtil, LinkHistoryItem } from '../utils/UrlHistoryUtil';
 import { WallpaperHost } from '../components/WallpaperHost';
+import { SafeArea } from '../utils/SafeArea';
 
 interface ScanViewControl {
   surfaceId: string;
@@ -553,6 +554,8 @@ export struct AppLinkingTool {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Transparent)
+    // 滚动到末尾时最后一张卡片会贴到屏幕底部，避让系统手势条
+    .padding({ bottom: SafeArea.bottom() })
   }
 
   @Builder

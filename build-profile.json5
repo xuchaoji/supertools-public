@@ -7,11 +7,11 @@
         "material": {
           "certpath": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001BBD2D8280E638C4A218A10097E14DBD0D78B31B2D64406581C24F44D853B0BE55A23B0EE5C4682B",
+          "keyPassword": "0000001B59026FC042A46805C625CEA571C4B4056993874AAB79BD3688B8849D2EC529F1D41F59ADBDC00B",
           "profile": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "C:\\Users\\xucha\\.ohos\\config\\default_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
-          "storePassword": "0000001BBE222E9A6C3CEE26B39AACE6A0613F9B07573B024FB6672C78DC04F6D47EEA1424325F7E02363B"
+          "storePassword": "0000001BCD83634FF0E77B06C1ABA909B448B4A8F281FC69FE1F6F4E203CAD4B0F341283731FC445236135"
         }
       },
       {

@@ -14,6 +14,7 @@ import { WallpaperHost } from '../components/WallpaperHost';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 import { LightSense } from '../utils/LightSense';
 import { QrCodeUtil } from '../utils/QrCodeUtil';
+import { SafeArea } from '../utils/SafeArea';
 
 const TAG: string = 'QrCodePage';
 
@@ -487,6 +488,8 @@ export struct QrCodePage {
       .height('100%')
       // 内容不足一屏时 Scroll 默认垂直居中，改为顶部对齐
       .align(Alignment.Top)
+      // 滚动到末尾时最后一张卡片会贴到屏幕底部，避让系统手势条
+      .padding({ bottom: SafeArea.bottom() })
     }
   }
 }

@@ -97,7 +97,9 @@ export default class MainAbility extends UIAbility {
     }
 
     try {
-      const wsOn = PreferencesUtil.getBooleanSync(SpKeys.WEB_SERVER_ON, true);
+      // 没有手动设置过 Web 服务开关时，用 target 的默认值：
+      // AG 上架版默认不启动，dev 默认自动启动；手动设置过则以持久化值为准
+      const wsOn = PreferencesUtil.getBooleanSync(SpKeys.WEB_SERVER_ON, TargetConstants.WEB_SERVER_AUTO_START);
       console.info(`${TAG} reading WEB_SERVER_ON = ${wsOn}`);
       if (wsOn && ctx) {
         WebServerUtil.getInstance().init(ctx.filesDir + '/wwwroot', 8088);
@@ -119,6 +121,12 @@ export default class MainAbility extends UIAbility {
   }
 
   restoreDefaults(TAG: string): void {
+    // 总开关关闭时各服务回到「默认状态」，Web 服务的默认值随 target 变化：
+    // AG 上架版默认不自动启动，dev 默认自动启动
+    if (!TargetConstants.WEB_SERVER_AUTO_START) {
+      console.info(`${TAG} web server default is OFF for this target, skip`);
+      return;
+    }
     try {
       WebServerUtil.getInstance().init(this.context.filesDir + '/wwwroot', 8088);
       WebServerUtil.getInstance().start().then(() => {

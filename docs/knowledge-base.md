@@ -338,6 +338,50 @@ try {
 - **禁止使用 `gridSpan`**（已弃用），改用 `constraintSize`
 - **禁止在 `Row` 上使用 `minHeight`**，改用 `.constraintSize({ minHeight: '100vp' })`
 
+### 5.7 沉浸式安全区（状态栏 / 手势条）
+
+`MainAbility` 调用 `setWindowLayoutFullScreen(true)`，页面铺满整屏，内容会延伸到状态栏与底部系统手势条下方。**避让责任是分开的：**
+
+| 区域 | 谁负责 | 做法 |
+|---|---|---|
+| 顶部状态栏 | `Index.ets` 根级 HMNavigation 容器 | 已统一 `padding({ top: getStatusBarHeight() + 'px' })` |
+| 底部手势条 | **各页面自己** | `.padding({ bottom: SafeArea.bottom() })` |
+
+> **坑 1（页面不要再避让状态栏）**：`Index` 已经给整个导航容器加了状态栏高度的顶部内边距，
+> 页面内部再加一次会整页下移一个状态栏高度。曾出问题：`HdcDebugPage` 因此整页偏下 108px。
+>
+> **坑 2（底部必须自己避让）**：`Index` 不处理底部，页面内容会一直铺到手势条下方。
+> 曾出问题：HDC 页输入区、LocalWeb 文件列表、隐私页按钮被手势条压住。
+
+统一入口是 `main/src/main/ets/utils/SafeArea.ets`：
+
+```typescript
+import { SafeArea } from '../utils/SafeArea';
+
+build() {
+  Column() { /* ... */ }
+    .width('100%').height('100%')
+    .padding({ bottom: SafeArea.bottom() })   // 底部避让手势条
+}
+```
+
+`SafeArea.bottom()` 返回 **px 字符串**（如 `"84px"`）—— `AppUtil.getNavigationIndicatorHeight()`
+返回的是 px，而 ArkUI 数值型 Length 默认单位是 vp，**必须带单位**，否则差 3 倍。
+
+本机实测（1084×2412，density 3）：状态栏 `108px`、手势条区域 `y 2328..2412`（高 `84px`）。
+自查命令：
+
+```bash
+hdc shell "hidump -s WindowManagerService -a '-a'"   # 看 SCBStatusBar24 / SCBGestureNavBar15 两行
+hdc shell "uitest dumpLayout -p /data/local/tmp/l.xml"  # 看元素 bounds 是否越过 2412-84
+```
+
+**检查清单**（改页面底部时逐条过）：
+- 底部元素（输入框 / 按钮 / Tab 栏）是否 `y1 <= 屏幕高 - 84`？
+- `List` / `Scroll` 是否 `layoutWeight(1)` 一直铺到屏底？→ 需要容器级 bottom padding。
+- 滚动列表滚动到末尾后，最后一个元素是否仍被手势条盖住？
+- 全屏 `Web` / 相机预览可以铺到屏底（沉浸式是预期设计），其余内容不行。
+
 ---
 
 ## 6. 关键组件 / API 模式
@@ -985,7 +1029,30 @@ $r('app.string.setting_tab')
 |---|---|---|---|---|
 | `floatingClockOn` | `HomePage.ets:~198` | `MainAbility.ets:~52` | `float_clock_on` | `false` |
 | `cpuStressOn` | `HomePage.ets:~217` | `MainAbility.ets:~66` | `cpu_stress_on` | `false` |
-| `isServerRunning` | `LocalWebPage.ets:~315` | `MainAbility.ets:~80` | `web_server_on` | `true` |
+| `isServerRunning` | `LocalWebPage.ets` → `toggleServer()` | `MainAbility.ets` → `restoreSavedState()` | `web_server_on` | 见 §13.1.1（随 target 变化） |
+
+### 13.1.1 本地 Web 服务的自动启动默认值（随 target 变化）
+
+`web_server_on` **没有手动设置过**时，用 `TargetConstants.WEB_SERVER_AUTO_START` 作为默认值：
+
+| target | 源集 | `WEB_SERVER_AUTO_START` | 行为 |
+|---|---|---|---|
+| `dev` | `src/dev/` | `true` | 启动应用即自动起 Web 服务 |
+| `default`（AG 上架） | `src/product/` | `false` | 默认**不**自动起，由用户在「本地web服务」页手动开启 |
+
+**用户手动开关过之后，一律以持久化的 `web_server_on` 为准**（不再看 target 默认值）。
+
+三个默认启动点全部由该 flag 守卫，改行为时不要漏：
+
+| 位置 | 场景 |
+|---|---|
+| `MainAbility.restoreSavedState()` | `getBooleanSync(WEB_SERVER_ON, TargetConstants.WEB_SERVER_AUTO_START)` |
+| `MainAbility.restoreDefaults()` | 总开关 `auto_start_enabled` 关闭时的降级分支 |
+| `PrivacyPage.startDefaultServices()` | 首次同意隐私协议后 |
+
+> 持久化键**只在手动操作时写入**（见下面的 `auto_start_enabled` 守卫），所以
+> 「Preferences 里存在 `web_server_on`」等价于「用户手动设置过」——AG 版升级上来的老用户
+> 若该键为 `true`，说明是他自己开的，会继续生效。
 
 ### 13.2 服务自启动总开关 (2.1.2 新增)
 
@@ -995,7 +1062,7 @@ $r('app.string.setting_tab')
 
 **总开关行为:**
 - **开启 (默认)**: 各服务开关变更时写入 Preferences，重启时从 Preferences 恢复
-- **关闭**: 不记录各服务开关状态，重启时全部使用默认值（Web服务=开，时钟/压测=关），关闭瞬间立即停止所有运行中服务
+- **关闭**: 不记录各服务开关状态，重启时全部使用默认值（时钟/压测=关；Web 服务见 §13.1.1 随 target），关闭瞬间立即停止所有运行中服务
 
 **受控的写入点（通过 `auto_start_enabled` 守卫）:**
 ```typescript
@@ -1013,13 +1080,15 @@ if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
 **恢复逻辑（MainAbility.restoreSavedState）:**
 ```typescript
 // 1. 隐私未同意 → 跳过全部
-// 2. auto_start_enabled = false → restoreDefaults() (web服务默认启动)
+// 2. auto_start_enabled = false → restoreDefaults()（Web 服务按 WEB_SERVER_AUTO_START 决定）
 // 3. auto_start_enabled = true  → 从 Preferences 读取各键恢复
+//    （web_server_on 缺省时用 TargetConstants.WEB_SERVER_AUTO_START）
 ```
 
 ### 13.3 隐私同意后 Web 服务立即启动
 
-`PrivacyPage.startDefaultServices()`: 用户点击「同意」后立即启动 Web 服务器（不包含 BackgroundService，避免通知弹窗）。
+`PrivacyPage.startDefaultServices()`: 用户点击「同意」后立即启动 Web 服务器
+（不包含 BackgroundService，避免通知弹窗）。AG 上架版该调用直接跳过，需用户手动开启。
 
 ### 13.4 SpKeys 枚举
 

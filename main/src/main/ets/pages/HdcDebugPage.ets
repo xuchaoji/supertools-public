@@ -1,6 +1,6 @@
 import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
 import hilog from "@ohos.hilog";
-import { AppUtil, PreferencesUtil } from "@pura/harmony-utils";
+import { PreferencesUtil } from "@pura/harmony-utils";
 import { HdcService, HdcShellResult } from "../utils/HdcService";
 import { SpKeys } from "../constant/SpKeys";
 import { connection } from "@kit.NetworkKit";
@@ -11,6 +11,7 @@ import fs from '@ohos.file.fs';
 import { picker } from '@kit.CoreFileKit';
 import { WallpaperHost } from '../components/WallpaperHost';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
+import { SafeArea } from '../utils/SafeArea';
 
 type EntryType = "input" | "output" | "error" | "system" | "meta";
 
@@ -942,7 +943,10 @@ export struct HdcDebugPage {
         }
         .width("100%").height("100%")
         .backgroundColor(Color.Transparent)
-        .padding({ top: AppUtil.getStatusBarHeight() + "px" as string })
+        // 顶部状态栏由 Index 根级 HMNavigation 容器统一避让（见 Index.ets），
+        // 这里若再加一次会整页下移一个状态栏高度；底部则需自行避让系统手势条，
+        // 否则底部输入区会被手势条压住
+        .padding({ bottom: SafeArea.bottom() })
         // 已抓取日志管理面板
         .bindSheet(this.showLogManager, this.logManagerSheet(), {
           height: 520,

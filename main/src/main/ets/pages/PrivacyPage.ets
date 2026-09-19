@@ -10,6 +10,7 @@ import { WebServerUtil } from '../utils/WebServerUtil';
 import { FloatWindowUtil } from '../utils/FloatWindowUtil';
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
 import { TargetConstants } from 'main/ets/TargetConstants';
+import { SafeArea } from '../utils/SafeArea';
 
 const TAG: string = 'PrivacyPage';
 
@@ -47,6 +48,12 @@ export struct PrivacyPage {
   }
 
   private startDefaultServices() {
+    // AG 上架版默认不自动启动本地 Web 服务（由用户在「本地web服务」页手动开启），
+    // dev 版仍保持同意隐私后自动启动
+    if (!TargetConstants.WEB_SERVER_AUTO_START) {
+      console.info('[PrivacyPage] web server auto-start disabled for this target, skip');
+      return;
+    }
     try {
       const ctx = GlobalContextHolder.getInstance().uiAbilityContext;
       if (!ctx) {
@@ -169,6 +176,8 @@ export struct PrivacyPage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.White)
+    // 底部「拒绝/同意」按钮贴屏底，需避让系统手势条
+    .padding({ bottom: SafeArea.bottom() })
   }
 
   private handleMailto(url: string) {

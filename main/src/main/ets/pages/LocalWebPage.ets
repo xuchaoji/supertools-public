@@ -16,6 +16,7 @@ import { WallpaperHost } from '../components/WallpaperHost';
 import { mediaquery } from '@kit.ArkUI';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 import { LightSense } from '../utils/LightSense';
+import { SafeArea } from '../utils/SafeArea';
 
 // --- 类型定义 ---
 interface MenuElement {
@@ -781,6 +782,8 @@ export struct LocalWebPage {
         }
         .height('100%').width('100%')
         .backgroundColor(Color.Transparent)
+        // 文件列表 List 会一直铺到屏幕底部，需避让系统手势条，否则最后一行被压住
+        .padding({ bottom: SafeArea.bottom() })
 
         if (this.viewModel.isEditing) {
           this.EditorLayer()
