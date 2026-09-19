@@ -704,6 +704,46 @@ struct StressCapsule {
 ```
 
 源集只在 `TargetConstants.ets` 上有差异，通过该文件控制功能开关。
+（`targets[].source.sourceRoots` 是**扩展**源集目录，`src/main` 始终参与构建，同名文件由目标源集覆盖。）
+
+### 7.2.1 dev target 的应用名称与图标
+
+dev target 与 AG 上架版本必须能一眼区分，相关配置分散在三处：
+
+| 位置 | 配置 | 作用 |
+|---|---|---|
+| `build-profile.json5` → `products[dev].label` | `$string:app_name_dev` | 应用信息（设置→应用）中的名称 |
+| `build-profile.json5` → `products[dev].icon` | `$media:layered_icon_dev` | 应用级图标 |
+| `main/build-profile.json5` → `targets[dev].source.abilities` | `MainAbility` 的 `label` / `icon` | **桌面图标与应用列表中的名称/图标** |
+
+> **关键点**：桌面（Launcher）上显示的是 **MainAbility 的 label/icon**，不是 `app.json5` 的。
+> 只改 `products[dev].label` 不会改变桌面显示的名称，必须同时覆盖 ability 的 label/icon。
+> `targets[].source.abilities` 只支持覆盖 `icon` / `label` / `launchType`，且是**合并语义**（不会裁剪其它 ability，
+> 见 hvigor `mergeBuildProfileAbilities`）。
+
+名称资源 `app_name_dev`（`超熵Dev` / `Chao's Dev`）与 dev 图标资源都放在 `AppScope/resources/base/media/`：
+
+| 资源 | 说明 |
+|---|---|
+| `foreground_dev.png` | 生产前景图 + 底部 `DEV` 小黄标，216×216 |
+| `layered_icon_dev.json` | 分层图标描述文件，复用生产 `$media:background` |
+
+> dev 图标**只多一个小黄标**：logo 图形与底版配色完全沿用生产图标，保证桌面上仍能认出是同一个 App。
+> `layered_icon_dev.json` 的 background 直接指向 `$media:background`，不额外复制底版文件。
+
+> 资源放在 `AppScope/` 而非 `main/src/dev/resources/` 的原因：**同名资源 AppScope 优先于模块资源**
+> （构建产物中 `background.png` 取自 AppScope 的 216×216 版本，而非模块内的 1024×1024 版本），
+> 且 `app.json5` 的 icon 只能在 AppScope 资源中解析。
+
+dev 图标由 `tools/gen_dev_icon.py` 从生产前景图派生（只改角标区域的像素，其余像素逐点保持一致），
+需要重新生成时执行：
+
+```bash
+python tools/gen_dev_icon.py
+```
+
+脚本顶部 `BADGE_*` 常量可调角标尺寸/位置/文案/配色，默认 72×26 的黄色圆角标，位于 logo 下方空白区
+（logo 实体范围 y 47..154）。脚本会自检：改动像素的包围盒必须完全落在角标框内，且与 logo 实体区域零重叠。
 
 ### 7.3 自定义 Hvigor 插件
 

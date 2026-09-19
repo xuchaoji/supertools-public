@@ -34,7 +34,16 @@
     },
     {
       "name": "dev",
-      "source": { "sourceRoots": ["./src/dev/"] }
+      "source": {
+        "sourceRoots": ["./src/dev/"],
+        "abilities": [
+          {
+            "name": "MainAbility",
+            "label": "$string:app_name_dev",
+            "icon": "$media:layered_icon_dev"
+          }
+        ]
+      }
     }
   ]
 }
