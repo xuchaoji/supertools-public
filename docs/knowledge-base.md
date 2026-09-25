@@ -809,8 +809,9 @@ python tools/gen_icon_1024.py
 ### 7.3 自定义 Hvigor 插件
 
 `main/hvigorfile.ts` 中的 `removePermissionPlugin()`：
-- 对 **非 dev 目标**（即 `default` / `product`）构建后，自动从 `module.json` 中移除 `ohos.permission.SYSTEM_FLOAT_WINDOW` 权限。
+- 对 **非 dev 目标**（即 `default` / `release` 上架版）构建后，自动从 `module.json` 中移除 `ohos.permission.SYSTEM_FLOAT_WINDOW` 权限。
 - 原理：在 `GeneratePkgModuleJson` 任务后、`PackageHap` 前修改中间产物 `module.json`。
+- 遍历 `main/build/<产品名>/intermediates/package/<target>/module.json`（**不硬编码产品名**），兼容任意产品名；`dev` 目标放行、保留悬浮窗权限。
 
 ### 7.4 常用构建命令
 
