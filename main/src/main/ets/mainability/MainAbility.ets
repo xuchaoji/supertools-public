@@ -71,12 +71,13 @@ export default class MainAbility extends UIAbility {
     try {
       const clockOn = PreferencesUtil.getBooleanSync(SpKeys.FLOAT_CLOCK_ON, false);
       console.info(`${TAG} reading FLOAT_CLOCK_ON = ${clockOn}`);
-      if (clockOn && ctx) {
+      // AG 上架版无悬浮窗权限，恢复时跳过悬浮时钟，避免无权限拉起悬浮窗
+      if (clockOn && ctx && TargetConstants.HAS_FLOATING_PERM) {
         CommonViewModel.getInstance().floatingClockOn = true;
         FloatClockManager.show(ctx);
         console.info(`${TAG} float clock restored`);
       } else {
-        console.info(`${TAG} float clock skip (on=${clockOn}, ctx=${!!ctx})`);
+        console.info(`${TAG} float clock skip (on=${clockOn}, ctx=${!!ctx}, perm=${TargetConstants.HAS_FLOATING_PERM})`);
       }
     } catch (e) {
       console.error(`${TAG} restore float clock failed: ${JSON.stringify(e)}`);
@@ -85,12 +86,13 @@ export default class MainAbility extends UIAbility {
     try {
       const stressOn = PreferencesUtil.getBooleanSync(SpKeys.CPU_STRESS_ON, false);
       console.info(`${TAG} reading CPU_STRESS_ON = ${stressOn}`);
-      if (stressOn && ctx) {
+      // AG 上架版无悬浮窗权限，恢复时跳过悬浮压测，避免无权限拉起悬浮窗
+      if (stressOn && ctx && TargetConstants.HAS_FLOATING_PERM) {
         CommonViewModel.getInstance().cpuStressOn = true;
         StressFloatWindowManager.getInstance().show(ctx);
         console.info(`${TAG} cpu stress restored`);
       } else {
-        console.info(`${TAG} cpu stress skip (on=${stressOn}, ctx=${!!ctx})`);
+        console.info(`${TAG} cpu stress skip (on=${stressOn}, ctx=${!!ctx}, perm=${TargetConstants.HAS_FLOATING_PERM})`);
       }
     } catch (e) {
       console.error(`${TAG} restore cpu stress failed: ${JSON.stringify(e)}`);

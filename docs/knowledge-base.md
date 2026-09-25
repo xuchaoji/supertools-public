@@ -731,20 +731,36 @@ struct StressCapsule {
 
 ## 7. 构建系统
 
-### 7.1 产品配置
+### 7.1 产品配置与签名
 
-两个产品变体 (`build-profile.json5`)：
+三个产品变体 + 三套签名，统一放在 `build-profile.json5`（无需切换文件）：
 
-| 产品名 | bundleName | 目标源集 | 用途 |
+| 产品名 | bundleName | 目标源集 | 签名 | 用途 |
+|---|---|---|---|---|
+| `dev` | `com.xuchaoji.hmos.supertools.dev` | `dev` | `dev`（调试，绑设备+ACL） | 本地开发（含悬浮工具） |
+| `default` | `com.xuchaoji.hmos.supertools` | `product` | `default`（调试） | AG 版本地验证（悬浮隐藏） |
+| `release` | `com.xuchaoji.hmos.supertools` | `product` | `release`（发布，`sign/`） | AppGallery 提审打包 |
+
+**包名 ↔ 签名强绑定**：`.p7b` 描述文件与 bundleName 绑定（调试版还绑设备 UDID + ACL 权限）。
+因此**包名一旦定下就不要改**——改包名 = 整套签名作废、需重新申请。
+
+| 签名 | 类型 | 物料位置 | 绑定 |
 |---|---|---|---|
-| `default` | `com.xuchaoji.hmos.supertools` | `product` | AppGallery 上线 |
-| `dev` | `com.xuchaoji.hmos.supertools.dev` | `dev` | 本地开发 |
+| `dev` | 调试 | `~/.ohos/config/dev_supertools-public_*` | `.dev` 包名 + 设备 + ACL |
+| `default` | 调试 | `~/.ohos/config/default_supertools-public_*` | AG 包名 + 设备 |
+| `release` | 发布 | `sign/supertools.cer/.p12/supertoolsRelease.p7b` | AG 包名（不绑设备，ACL 为空） |
+
+> 调试签名交给 DevEco Studio 自动管理：换设备或申请 ACL 权限后，在
+> Project Structure → Signing Configs 点 **Fix** 自动重生成，无需手改密码。
+> 发布签名只在「打上架包」时用，平时不要碰。旧文件 `build-profile-pad-release.json5` 已废弃，
+> 其内容已并入本文件 `release` 签名/产品。
 
 ### 7.2 源集覆盖
 
 ```
-构建 dev 产品  → main/ets/... + src/dev/ets/TargetConstants.ets
-构建 default   → main/ets/... + src/product/ets/TargetConstants.ets
+构建 dev 产品      → main/ets/... + src/dev/ets/TargetConstants.ets
+构建 default 产品  → main/ets/... + src/product/ets/TargetConstants.ets
+构建 release 产品  → main/ets/... + src/product/ets/TargetConstants.ets
 ```
 
 源集只在 `TargetConstants.ets` 上有差异，通过该文件控制功能开关。
@@ -769,25 +785,26 @@ dev target 与 AG 上架版本必须能一眼区分，相关配置分散在三�
 
 | 资源 | 说明 |
 |---|---|
-| `foreground_dev.png` | 生产前景图 + 底部 `DEV` 小黄标，216×216 |
+| `foreground_dev.png` | 生产前景图 + 底部 `DEV` 小黄标，1024×1024 |
 | `layered_icon_dev.json` | 分层图标描述文件，复用生产 `$media:background` |
 
 > dev 图标**只多一个小黄标**：logo 图形与底版配色完全沿用生产图标，保证桌面上仍能认出是同一个 App。
 > `layered_icon_dev.json` 的 background 直接指向 `$media:background`，不额外复制底版文件。
 
 > 资源放在 `AppScope/` 而非 `main/src/dev/resources/` 的原因：**同名资源 AppScope 优先于模块资源**
-> （构建产物中 `background.png` 取自 AppScope 的 216×216 版本，而非模块内的 1024×1024 版本），
+> （`main` 模块内也有一套 `background.png`/`foreground.png`，但构建产物取的是 AppScope 的版本），
 > 且 `app.json5` 的 icon 只能在 AppScope 资源中解析。
 
-dev 图标由 `tools/gen_dev_icon.py` 从生产前景图派生（只改角标区域的像素，其余像素逐点保持一致），
-需要重新生成时执行：
+生产图标（`background.png` / `foreground.png`）与 dev 图标（`foreground_dev.png`）均为 1024×1024，
+由 `tools/gen_icon_1024.py` 从 216×216 旧资源 + 1024×1024 的 `icon.png` 一次性重生成：
 
 ```bash
-python tools/gen_dev_icon.py
+python tools/gen_icon_1024.py
 ```
 
-脚本顶部 `BADGE_*` 常量可调角标尺寸/位置/文案/配色，默认 72×26 的黄色圆角标，位于 logo 下方空白区
-（logo 实体范围 y 47..154）。脚本会自检：改动像素的包围盒必须完全落在角标框内，且与 logo 实体区域零重叠。
+> 分层图标规范：后景图须为 1024×1024、方角、不透明；前景图须为 1024×1024、透明底只含 logo。
+> `gen_icon_1024.py` 会把圆角后景图的透明圆角用描边色填成方角不透明，并把 logo 从 `icon.png`
+> 中抠到透明前景上，合成结果与原图标逐点一致。旧的 `tools/gen_dev_icon.py`（216 角标派生）已废弃。
 
 ### 7.3 自定义 Hvigor 插件
 
@@ -797,9 +814,23 @@ python tools/gen_dev_icon.py
 
 ### 7.4 常用构建命令
 
+| 脚本 | 关键参数 | 用途 |
+|---|---|---|
+| `build-dev.bat` | `product=dev` + `dev` 调试签名 | 本地开发，构建并安装 `.dev` 包 |
+| `build-ag-debug.bat` | `product=default` + `default` 调试签名 | AG 版本地验证，构建并安装 AG 包 |
+| `build-ag-release.bat` | `product=release` + `release` 发布签名 | 提审打包（仅构建，不安装） |
+
+命令行等价：
+
 ```bash
-hvigor assembleHap --mode module -p product=default -p buildMode=release
-hvigor assembleHap --mode module -p product=dev -p buildMode=debug
+# dev（含悬浮工具）
+hvigorw --mode module -p module=main@dev -p product=dev -p buildMode=debug -p requiredDeviceType=phone assembleHap
+
+# AG 本地验证（悬浮入口隐藏）
+hvigorw --mode module -p module=main@product -p product=default -p buildMode=debug -p requiredDeviceType=phone assembleHap
+
+# AG 提审（发布签名）
+hvigorw --mode module -p module=main@product -p product=release -p buildMode=release -p requiredDeviceType=phone assembleHap
 ```
 
 ---

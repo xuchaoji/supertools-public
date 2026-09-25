@@ -20,11 +20,24 @@
         "material": {
           "certpath": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001B78A9F4D7BB9285070FE0D664144D3F0E6E9BE90C0DB182D269294D677B71603C5582F610EE3BBF",
+          "keyPassword": "0000001B3E392C6CD79B3AF58C1B258A28D60A86BA09A5BF367E9F9DB83C8BC9EB6A45961555F21AE8D645",
           "profile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "C:\\Users\\xucha\\.ohos\\config\\dev_supertools-public_lwjMxnaM53JfhHUaQ8E2aqToJYww7AJl_vytqKI5Uww=.p12",
-          "storePassword": "0000001BE03E9D53F6B16A8D4C02977A3277234A43F832A3EA0CA5A938F8168F41E3BD59B301CB85C380C1"
+          "storePassword": "0000001B5C86912866F6621AC9EEE6241C5098F2C992FA52F69A2DBC158F1B13F8E95091A7870F2CBDAB17"
+        }
+      },
+      {
+        "name": "release",
+        "type": "HarmonyOS",
+        "material": {
+          "storeFile": "D:/dev/devEcoWkSpace/supertools-public/sign/supertools.p12",
+          "storePassword": "00000019DD72FB26037C821BAC415776A961DD8E1C07B5E35BC9030369823C2D544BAF9246C8D79368",
+          "keyAlias": "supertools",
+          "keyPassword": "000000190262FC8BC1D38F8A0B5D2CE15CDCCB5B2C6CFDDA390264C345D7678FDB28E6A05233A7113B",
+          "signAlg": "SHA256withECDSA",
+          "profile": "D:/dev/devEcoWkSpace/supertools-public/sign/supertoolsRelease.p7b",
+          "certpath": "D:/dev/devEcoWkSpace/supertools-public/sign/supertools.cer"
         }
       }
     ],
@@ -35,7 +48,7 @@
         "targetSdkVersion": "5.0.5(17)",
         "compatibleSdkVersion": "5.0.5(17)",
         "runtimeOS": "HarmonyOS",
-        "bundleName": "com.xuchaoji.hmos.supertools.dev",
+        "bundleName": "com.xuchaoji.hmos.supertools",
         "label": "$string:app_name",
         "buildOption": {
           "strictMode": {
@@ -53,6 +66,21 @@
         "bundleName": "com.xuchaoji.hmos.supertools.dev",
         "label": "$string:app_name_dev",
         "icon": "$media:layered_icon_dev",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "release",
+        "signingConfig": "release",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools",
+        "label": "$string:app_name",
         "buildOption": {
           "strictMode": {
             "caseSensitiveCheck": true,
@@ -78,7 +106,8 @@
         {
           "name": "product",
           "applyToProducts": [
-            "default"
+            "default",
+            "release"
           ]
         },
         {

@@ -897,17 +897,17 @@ export struct HomePage {
           .fontSize($r('sys.float.Body_L'))
           .fontWeight(FontWeight.Bold)
           .fontColor($r('sys.color.font_secondary'))
-          .visibility(TargetConstants.HAS_FLOATING_PERM ? Visibility.Visible:Visibility.None)
+          .visibility(!TargetConstants.IS_AG_TARGET ? Visibility.Visible:Visibility.None)
           // 深色/浅色模式可读性：阴影颜色与文字相反
           .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
         SettingGroup({
-          vis: TargetConstants.HAS_FLOATING_PERM
+          vis: !TargetConstants.IS_AG_TARGET
         }) {
           SettingSwitchItem({
             title: '启用悬浮时钟',
             isOn: CommonViewModel.getInstance().floatingClockOn,
-            vis: TargetConstants.HAS_FLOATING_PERM,
+            vis: !TargetConstants.IS_AG_TARGET,
             onChange: (isOn: boolean) => {
               CommonViewModel.getInstance().floatingClockOn = isOn;
               if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {
@@ -926,7 +926,7 @@ export struct HomePage {
           SettingSwitchItem({
             title: '启用悬浮压测',
             isOn: CommonViewModel.getInstance().cpuStressOn,
-            vis: TargetConstants.HAS_FLOATING_PERM,
+            vis: !TargetConstants.IS_AG_TARGET,
             onChange: (isOn: boolean) => {
               CommonViewModel.getInstance().cpuStressOn = isOn;
               if (PreferencesUtil.getBooleanSync(SpKeys.AUTO_START_ENABLED, true)) {

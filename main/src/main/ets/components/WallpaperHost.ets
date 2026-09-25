@@ -78,5 +78,8 @@ export struct WallpaperHost {
     }
     .width('100%')
     .height('100%')
+    // 与主页一致的底版色：有壁纸时透明透出壁纸，无壁纸时用与主页相同的灰底，
+    // 避免子页面透出 NavDestination 白底 / 根级灰底，造成观感不一致
+    .backgroundColor(this.wallpaperPm ? Color.Transparent : $r('sys.color.background_secondary'))
   }
 }
