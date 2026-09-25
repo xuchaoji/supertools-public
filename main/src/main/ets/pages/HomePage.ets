@@ -649,6 +649,12 @@ export struct HomePage {
     }
   }
 
+  /** 当前实际渲染的工具列表；拖拽索引必须与此列表保持一致。 */
+  private visibleTools(): ToolCardItem[] {
+    return this.listData.filter((item: ToolCardItem) =>
+      !(item.name === 'HDC 调试' && !this.isHdcVisible));
+  }
+
   /** 保存当前工具卡片顺序（按 name） */
   private saveToolOrder(): void {
     try {
@@ -1228,10 +1234,8 @@ export struct HomePage {
   toolList() {
     Column() {
       Grid(new Scroller()) {
-        ForEach(this.listData, (item: ToolCardItem) => {
-          // HDC 调试在上架版默认隐藏：条件渲染避免 Grid 占位空洞
-          if (!(item.name === 'HDC 调试' && !this.isHdcVisible)) {
-            GridItem() {
+        ForEach(this.visibleTools(), (item: ToolCardItem) => {
+          GridItem() {
               // 沉浸光感多层结构：毛玻璃基底 -> 光感渐变 -> 内容
               Stack() {
                 // 图层1：毛玻璃基底
@@ -1311,25 +1315,35 @@ export struct HomePage {
               this.itemData.width = (newValue.width as number) * 1.1;
               this.itemData.height = (newValue.height as number) * 1.1;
             })
-          }
         }, (item: ToolCardItem) => JSON.stringify(item))
       }
       .scrollBar(BarState.Off)
       .editMode(true)
       .onItemDragStart((_event: ItemDragInfo, itemIndex: number) => {
-        this.itemData.toolCardItem = this.listData[itemIndex];
+        const visible: ToolCardItem[] = this.visibleTools();
+        if (itemIndex < 0 || itemIndex >= visible.length) {
+          return pixelMapBuilder(this.itemData, this.isDark);
+        }
+        this.itemData.toolCardItem = visible[itemIndex];
         return pixelMapBuilder(this.itemData, this.isDark);
       })
       .onItemDrop((_event: ItemDragInfo, itemIndex: number, insertIndex: number, isSuccess: boolean): void => {
-        if (!isSuccess || insertIndex >= this.listData.length) {
+        const visible: ToolCardItem[] = this.visibleTools();
+        if (!isSuccess || itemIndex < 0 || insertIndex < 0 ||
+          itemIndex >= visible.length || insertIndex >= visible.length || itemIndex === insertIndex) {
+          return;
+        }
+        const sourceIndex: number = this.listData.indexOf(visible[itemIndex]);
+        const targetIndex: number = this.listData.indexOf(visible[insertIndex]);
+        if (sourceIndex < 0 || targetIndex < 0) {
           return;
         }
         animateTo(
           { duration: 200, curve: Curve.Friction },
           () => {
-            const temp: ToolCardItem = this.listData[itemIndex];
-            this.listData[itemIndex] = this.listData[insertIndex];
-            this.listData[insertIndex] = temp;
+            const temp: ToolCardItem = this.listData[sourceIndex];
+            this.listData[sourceIndex] = this.listData[targetIndex];
+            this.listData[targetIndex] = temp;
           })
         // 持久化拖拽后的顺序，重启后保持
         this.saveToolOrder();

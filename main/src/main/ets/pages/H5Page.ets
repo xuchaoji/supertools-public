@@ -39,8 +39,6 @@ export struct H5Page {
   @Local openedUrl: string = '';
   /** 顶栏显示的网页标题（未取到前用 host） */
   @Local webTitle: string = '';
-  /** 网页加载中（刷新/跳转时置 true） */
-  @Local webLoading: boolean = false;
   /** 沉浸光感：跟随系统深/浅色模式 */
   @Local isDark: boolean = false;
   /** 扫码解析开关（与 AppLinkingTool 同一 SpKey，设置页彩蛋开启后显示按钮） */
@@ -141,7 +139,6 @@ export struct H5Page {
       return;
     }
     this.webTitle = parsed.hostname ? parsed.hostname : url;
-    this.webLoading = true;
     this.openedUrl = url;
     // 记录历史（最新在前、去重、上限 30）
     this.historyList = LinkHistoryUtil.add(this.historyList, url);
@@ -174,7 +171,6 @@ export struct H5Page {
   private exitViewer(): void {
     this.openedUrl = '';
     this.webTitle = '';
-    this.webLoading = false;
   }
 
   /** 扫码回填：与 AppLinkingTool 一致，识别结果填入输入框并解析 */
@@ -234,11 +230,9 @@ export struct H5Page {
         value: '刷新',
         action: (): void => {
           try {
-            this.webLoading = true;
             this.webController.refresh();
           } catch (err) {
             console.error(`[${TAG}] refresh failed: ${JSON.stringify(err)}`);
-            this.webLoading = false;
           }
         }
       },
@@ -816,11 +810,7 @@ export struct H5Page {
         .javaScriptAccess(true)
         .domStorageAccess(true)
         .onlineImageAccess(true)
-        .onPageBegin(() => {
-          this.webLoading = true;
-        })
         .onPageEnd(() => {
-          this.webLoading = false;
           this.refreshWebTitle();
         })
         .onTitleReceive((event) => {

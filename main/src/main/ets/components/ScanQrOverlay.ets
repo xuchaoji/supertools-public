@@ -60,33 +60,31 @@ export struct ScanQrOverlay {
     } catch (err) {
       console.error(`[${TAG}] release customScan: ${JSON.stringify(err)}`);
     }
-    if (this.resourcesReady) {
-      this.resourcesReady = false;
-      try {
-        if (this.captureSession) {
-          this.captureSession.stop();
-          this.captureSession.release();
-          this.captureSession = null;
-        }
-      } catch (err) {
-        console.error(`[${TAG}] release session: ${JSON.stringify(err)}`);
+    this.resourcesReady = false;
+    try {
+      if (this.captureSession) {
+        this.captureSession.stop();
+        this.captureSession.release();
+        this.captureSession = null;
       }
-      try {
-        if (this.cameraInput) {
-          this.cameraInput.close();
-          this.cameraInput = null;
-        }
-      } catch (err) {
-        console.error(`[${TAG}] close cameraInput: ${JSON.stringify(err)}`);
+    } catch (err) {
+      console.error(`[${TAG}] release session: ${JSON.stringify(err)}`);
+    }
+    try {
+      if (this.cameraInput) {
+        this.cameraInput.close();
+        this.cameraInput = null;
       }
-      try {
-        if (this.previewOutput) {
-          this.previewOutput.release();
-          this.previewOutput = null;
-        }
-      } catch (err) {
-        console.error(`[${TAG}] release previewOutput: ${JSON.stringify(err)}`);
+    } catch (err) {
+      console.error(`[${TAG}] close cameraInput: ${JSON.stringify(err)}`);
+    }
+    try {
+      if (this.previewOutput) {
+        this.previewOutput.release();
+        this.previewOutput = null;
       }
+    } catch (err) {
+      console.error(`[${TAG}] release previewOutput: ${JSON.stringify(err)}`);
     }
   }
 

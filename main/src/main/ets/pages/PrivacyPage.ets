@@ -8,6 +8,7 @@ import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { WebServerUtil } from '../utils/WebServerUtil';
 import { FloatWindowUtil } from '../utils/FloatWindowUtil';
+import { BackgroundServiceManager } from '../utils/BackgroundServiceManager';
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
 import { TargetConstants } from 'main/ets/TargetConstants';
 import { SafeArea } from '../utils/SafeArea';
@@ -22,6 +23,7 @@ export struct PrivacyPage {
   @Local viewModel: CommonViewModel = CommonViewModel.getInstance();
   // 状态管理
   @Local isLoading: boolean = true;
+  @Local safeBottom: string = '0px';
 
   @Local isControllerAttached:boolean = false;
 
@@ -33,6 +35,7 @@ export struct PrivacyPage {
   }
 
   aboutToAppear() {
+    this.safeBottom = SafeArea.bottom();
   }
 
   // 保存用户选择
@@ -62,9 +65,11 @@ export struct PrivacyPage {
       }
       WebServerUtil.getInstance().init(ctx.filesDir + '/wwwroot', 8088);
       WebServerUtil.getInstance().start().then(() => {
+        const ip: string = WebServerUtil.getInstance().getIpAddress();
         if (TargetConstants.HAS_FLOATING_PERM) {
           FloatWindowUtil.showFloatWindow();
         }
+        BackgroundServiceManager.startWebServer(ip);
         console.info('[PrivacyPage] web server started on privacy agreed');
       }).catch((err: Object) => {
         console.error('[PrivacyPage] web server start failed:', JSON.stringify(err));
@@ -177,7 +182,7 @@ export struct PrivacyPage {
     .height('100%')
     .backgroundColor(Color.White)
     // 底部「拒绝/同意」按钮贴屏底，需避让系统手势条
-    .padding({ bottom: SafeArea.bottom() })
+    .padding({ bottom: this.safeBottom })
   }
 
   private handleMailto(url: string) {

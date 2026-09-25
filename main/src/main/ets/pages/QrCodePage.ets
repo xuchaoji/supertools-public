@@ -48,9 +48,12 @@ export struct QrCodePage {
   @Local historyList: Array<QrHistoryItem> = [];
   /** 沉浸光感：跟随系统深/浅色模式 */
   @Local isDark: boolean = false;
+  /** 页面出现时缓存底部安全区，避免 build 中同步查询窗口服务。 */
+  @Local safeBottom: string = '0px';
   private themeMq: mediaquery.MediaQueryListener | null = null;
 
   aboutToAppear(): void {
+    this.safeBottom = SafeArea.bottom();
     this.initThemeListener();
     this.loadHistory();
   }
@@ -195,6 +198,8 @@ export struct QrCodePage {
       return;
     }
     this.isSaving = true;
+    let srcFile: fileIo.File | null = null;
+    let desFile: fileIo.File | null = null;
     try {
       const context: common.UIAbilityContext = this.getUIContext().getHostContext() as common.UIAbilityContext;
       const srcPath: string = await QrCodeUtil.savePngToCache(context, this.qrPm);
@@ -205,16 +210,24 @@ export struct QrCodePage {
         photoType: photoAccessHelper.PhotoType.IMAGE
       }];
       const desFileUris: Array<string> = await phAccessHelper.showAssetsCreationDialog(srcFileUris, photoCreationConfigs);
-      const desFile: fileIo.File = await fileIo.open(desFileUris[0], fileIo.OpenMode.WRITE_ONLY);
-      const srcFile: fileIo.File = await fileIo.open(srcPath, fileIo.OpenMode.READ_ONLY);
+      if (!desFileUris || desFileUris.length === 0) {
+        promptAction.showToast({ message: '已取消保存', duration: 1000 });
+        return;
+      }
+      desFile = await fileIo.open(desFileUris[0], fileIo.OpenMode.WRITE_ONLY);
+      srcFile = await fileIo.open(srcPath, fileIo.OpenMode.READ_ONLY);
       await fileIo.copyFile(srcFile.fd, desFile.fd);
-      fileIo.closeSync(srcFile);
-      fileIo.closeSync(desFile);
       promptAction.showToast({ message: '二维码已保存到相册', duration: 1500 });
     } catch (e) {
       console.error(`[${TAG}] saveToAlbum failed: ${JSON.stringify(e)}`);
       promptAction.showToast({ message: '保存失败', duration: 1500 });
     } finally {
+      if (srcFile) {
+        try { fileIo.closeSync(srcFile); } catch (e) { console.error(`[${TAG}] close source failed`); }
+      }
+      if (desFile) {
+        try { fileIo.closeSync(desFile); } catch (e) { console.error(`[${TAG}] close destination failed`); }
+      }
       this.isSaving = false;
     }
   }
@@ -489,7 +502,7 @@ export struct QrCodePage {
       // 内容不足一屏时 Scroll 默认垂直居中，改为顶部对齐
       .align(Alignment.Top)
       // 滚动到末尾时最后一张卡片会贴到屏幕底部，避让系统手势条
-      .padding({ bottom: SafeArea.bottom() })
+      .padding({ bottom: this.safeBottom })
     }
   }
 }

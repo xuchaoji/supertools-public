@@ -19,7 +19,7 @@ export class QrCodeUtil {
     const packer: image.ImagePacker = image.createImagePacker();
     try {
       const buf: ArrayBuffer = await packer.packing(pm, { format: 'image/png', quality: 100 });
-      const path: string = `${context.cacheDir}/qr_${Date.now()}.png`;
+      const path: string = `${context.cacheDir}/qr_export.png`;
       const file: fileIo.File = fileIo.openSync(path,
         fileIo.OpenMode.READ_WRITE | fileIo.OpenMode.CREATE | fileIo.OpenMode.TRUNC);
       try {

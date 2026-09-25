@@ -5,6 +5,15 @@ import { CommonViewModel } from '../viewmodel/CommonViewModel';
 const workerPort: ThreadWorkerGlobalScope = worker.workerPort;
 
 const TAG: string = 'CalcWorkerTag'
+let timerId: number = -1;
+
+function stopCalculation(): void {
+  CommonViewModel.getInstance().isWorkerRunning = false;
+  if (timerId >= 0) {
+    clearInterval(timerId);
+    timerId = -1;
+  }
+}
 /**
  * Defines the event handler to be called when the worker thread receives a message sent by the host thread.
  * The event handler is executed in the worker thread.
@@ -14,6 +23,7 @@ const TAG: string = 'CalcWorkerTag'
 workerPort.onmessage = (event: MessageEvents) => {
   console.log(TAG, `onmessage: ${event.data.action}`)
   if (event.data.action === 'start') {
+    stopCalculation();
     CommonViewModel.getInstance().isWorkerRunning = true;
     CommonViewModel.getInstance().maxCalcCount = event.data.maxCalcCount;
     // 发送日志到主线程
@@ -22,7 +32,7 @@ workerPort.onmessage = (event: MessageEvents) => {
       message: '开始执行高负载计算...'
     });
 
-    setInterval(() => {
+    timerId = setInterval(() => {
       try {
         const calcResult = heavyCalculation();
 
@@ -43,7 +53,7 @@ workerPort.onmessage = (event: MessageEvents) => {
   }
 
   if(event.data.action === 'stop') {
-    CommonViewModel.getInstance().isWorkerRunning = false;
+    stopCalculation();
   }
 }
 

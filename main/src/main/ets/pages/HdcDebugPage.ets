@@ -71,6 +71,7 @@ export struct HdcDebugPage {
   private entrySeq: number = 0;
   /** 沉浸光感：跟随系统深/浅色模式，驱动文字阴影保证任意壁纸背景可读 */
   @Local isDark: boolean = false;
+  @Local safeBottom: string = '0px';
   private themeMq: mediaquery.MediaQueryListener | null = null;
 
   private readonly quickGroups: QuickGroup[] = [
@@ -132,6 +133,7 @@ export struct HdcDebugPage {
   ];
 
   aboutToAppear(): void {
+    this.safeBottom = SafeArea.bottom();
     hilog.info(0x0000, "HDC_Z", "HdcDebugPage aboutToAppear");
     this.initThemeListener();
     this.addSystem("=== SuperTools HDC ===");
@@ -946,7 +948,7 @@ export struct HdcDebugPage {
         // 顶部状态栏由 Index 根级 HMNavigation 容器统一避让（见 Index.ets），
         // 这里若再加一次会整页下移一个状态栏高度；底部则需自行避让系统手势条，
         // 否则底部输入区会被手势条压住
-        .padding({ bottom: SafeArea.bottom() })
+        .padding({ bottom: this.safeBottom })
         // 已抓取日志管理面板
         .bindSheet(this.showLogManager, this.logManagerSheet(), {
           height: 520,

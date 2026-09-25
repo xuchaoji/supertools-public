@@ -2,7 +2,6 @@ import { HMRouter } from '@hadss/hmrouter';
 import { PageNames } from '../constant/PageNames';
 import { SpKeys } from '../constant/SpKeys';
 import { WebServerUtil } from '../utils/WebServerUtil';
-import { BackgroundTaskUtil } from '../utils/BackgroundTaskUtil';
 import { FloatWindowUtil } from '../utils/FloatWindowUtil';
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { common, bundleManager } from '@kit.AbilityKit';
@@ -75,9 +74,11 @@ export struct LocalWebPage {
   private renameTargetItem: FileItem | null = null;
   /** 沉浸光感：跟随系统深/浅色模式（顶部状态卡片毛玻璃用） */
   @Local isDark: boolean = false;
+  @Local safeBottom: string = '0px';
   private themeMq: mediaquery.MediaQueryListener | null = null;
 
   aboutToAppear(): void {
+    this.safeBottom = SafeArea.bottom();
     try {
       this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(display-mode: dark)');
       this.isDark = this.themeMq.matches;
@@ -87,7 +88,6 @@ export struct LocalWebPage {
     } catch (e) {
       this.isDark = false;
     }
-    BackgroundTaskUtil.init(this.context);
     FloatWindowUtil.init(this.context);
     this.viewModel.rootDir = this.context.filesDir + '/wwwroot';
     let bundleName = this.context.applicationInfo.name;
@@ -783,7 +783,7 @@ export struct LocalWebPage {
         .height('100%').width('100%')
         .backgroundColor(Color.Transparent)
         // 文件列表 List 会一直铺到屏幕底部，需避让系统手势条，否则最后一行被压住
-        .padding({ bottom: SafeArea.bottom() })
+        .padding({ bottom: this.safeBottom })
 
         if (this.viewModel.isEditing) {
           this.EditorLayer()

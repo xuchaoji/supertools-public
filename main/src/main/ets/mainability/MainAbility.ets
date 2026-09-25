@@ -1,14 +1,8 @@
-import {
-  AbilityConstant, ConfigurationConstant, UIAbility, Want,
-  WantAgent,
-  wantAgent } from '@kit.AbilityKit';
+import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { display, window } from '@kit.ArkUI';
 import { HMRouterMgr } from '@hadss/hmrouter';
 import { AppUtil, GlobalContext, PreferencesUtil } from '@pura/harmony-utils';
-import { BusinessError } from '@kit.BasicServicesKit';
-import { backgroundTaskManager } from '@kit.BackgroundTasksKit';
-import { BackgroundTaskUtil } from '../utils/BackgroundTaskUtil';
 import { FloatWindowUtil } from '../utils/FloatWindowUtil';
 import { BackgroundServiceManager } from '../utils/BackgroundServiceManager';
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
@@ -29,7 +23,6 @@ export default class MainAbility extends UIAbility {
     this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
     AppUtil.init(this.context);
-    BackgroundTaskUtil.init(this.context);
     BackgroundServiceManager.init(this.context);
     FloatWindowUtil.init(this.context);
     GlobalContextHolder.getInstance().uiAbilityContext = this.context;
@@ -110,6 +103,7 @@ export default class MainAbility extends UIAbility {
           if (TargetConstants.HAS_FLOATING_PERM) {
             FloatWindowUtil.showFloatWindow();
           }
+          BackgroundServiceManager.startWebServer(ip);
           console.info(`${TAG} web server restored`);
         }).catch((err: Object) => {
           console.error(`${TAG} web server start failed: ${JSON.stringify(err)}`);
@@ -132,9 +126,11 @@ export default class MainAbility extends UIAbility {
     try {
       WebServerUtil.getInstance().init(this.context.filesDir + '/wwwroot', 8088);
       WebServerUtil.getInstance().start().then(() => {
+        const ip: string = WebServerUtil.getInstance().getIpAddress();
         if (TargetConstants.HAS_FLOATING_PERM) {
           FloatWindowUtil.showFloatWindow();
         }
+        BackgroundServiceManager.startWebServer(ip);
         console.info(`${TAG} web server started (default)`);
       }).catch((err: Object) => {
         console.error(`${TAG} web server default start failed: ${JSON.stringify(err)}`);
@@ -185,45 +181,12 @@ export default class MainAbility extends UIAbility {
   }
 
   onForeground(): void {
-    // Ability has brought to foreground
+    // 后台任务统一由 BackgroundServiceManager 根据实际服务状态管理，
+    // 前台切换不能无条件停止，否则会中断仍在运行的 Web/录屏服务。
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onForeground');
-    this.stopContinuousTask();
   }
 
   onBackground(): void {
-    // Ability has back to background
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onBackground');
-    // this.startContinuousTask() 切换到BackgroundServiceManager
-  }
-
-  startContinuousTask() {
-    let wantAgentInfo: wantAgent.WantAgentInfo = {
-      wants: [
-        {
-          bundleName: "com.xuchaoji.hmos.supertools",
-          abilityName: "MainAbility"
-        }
-      ],
-      actionType: wantAgent.OperationType.START_ABILITY,
-      requestCode: 0,
-      wantAgentFlags: [wantAgent.WantAgentFlags.UPDATE_PRESENT_FLAG]
-    };
-
-    wantAgent.getWantAgent(wantAgentInfo).then((wantAgentObj: WantAgent) => {
-      backgroundTaskManager.startBackgroundRunning(this.context,
-        backgroundTaskManager.BackgroundMode.AUDIO_RECORDING, wantAgentObj).then(() => {
-        hilog.info(DOMAIN, 'testTag', 'Succeeded in operation startBackgroundRunning.');
-      }).catch((err: BusinessError) => {
-        hilog.error(DOMAIN, 'testTag', 'Failed to operation startBackgroundRunning. %{public}s', JSON.stringify(err));
-      });
-    });
-  }
-
-  stopContinuousTask() {
-    backgroundTaskManager.stopBackgroundRunning(this.context).then(() => {
-      hilog.info(DOMAIN, 'testTag', 'Succeeded in operation stopBackgroundRunning.');
-    }).catch((err: BusinessError) => {
-      hilog.error(DOMAIN, 'testTag', 'Failed to operation stopBackgroundRunning. %{public}s', JSON.stringify(err));
-    });
   }
 }

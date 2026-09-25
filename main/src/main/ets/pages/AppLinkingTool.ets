@@ -3,22 +3,14 @@ import promptAction from '@ohos.promptAction';
 import pasteboard from '@ohos.pasteboard';
 import { URLParserUtil, ParsedQueryParam, ParsedURLResult } from '../utils/URLParserUtil';
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
-import { abilityAccessCtrl, common, Want } from '@kit.AbilityKit';
+import { common, Want } from '@kit.AbilityKit';
 import { BusinessError } from '@kit.BasicServicesKit';
-import { customScan, scanCore, scanBarcode } from '@kit.ScanKit';
-import { camera } from '@kit.CameraKit';
-import { display } from '@kit.ArkUI';
 import { PreferencesUtil } from '@pura/harmony-utils';
 import { SpKeys } from '../constant/SpKeys';
 import { LinkHistoryUtil, LinkHistoryItem } from '../utils/UrlHistoryUtil';
 import { WallpaperHost } from '../components/WallpaperHost';
 import { SafeArea } from '../utils/SafeArea';
-
-interface ScanViewControl {
-  surfaceId: string;
-  width: number;
-  height: number;
-}
+import { ScanQrOverlay } from '../components/ScanQrOverlay';
 
 const TAG: string = 'AppLinkingTool';
 
@@ -33,15 +25,10 @@ export struct AppLinkingTool {
   @State historyList: LinkHistoryItem[] = [];
   /** 拉起方式：true=openLink（App Linking/深链官方入口）；false=startAbility(viewData 传统拉起） */
   @State launchViaOpenLink: boolean = true;
-
-  private xCompController: XComponentController = new XComponentController();
-  private surfaceId: string = '';
-  private cameraInput: camera.CameraInput | null = null;
-  private captureSession: camera.CaptureSession | null = null;
-  private previewOutput: camera.PreviewOutput | null = null;
-  private isResourcesReady: boolean = false;
+  @State safeBottom: string = '0px';
 
   aboutToAppear(): void {
+    this.safeBottom = SafeArea.bottom();
     this.historyList = LinkHistoryUtil.load(SpKeys.APP_LINKING_HISTORY);
     this.launchViaOpenLink = PreferencesUtil.getBooleanSync(SpKeys.APP_LINK_LAUNCH_MODE, true);
     this.isScanVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_SCAN_PARSE, false);
@@ -50,49 +37,6 @@ export struct AppLinkingTool {
       this.inputUrl = storedResult;
       this.parsedResult = URLParserUtil.parse(storedResult);
       AppStorage.set('appLinkingScannedUrl', '');
-    }
-  }
-
-  aboutToDisappear(): void {
-    this.stopCamera();
-  }
-
-  private async onScanCancelled(): Promise<void> {
-    this.isScanning = false;
-    customScan.stop();
-    await customScan.release();
-    this.stopCamera();
-  }
-
-  private stopCamera(): void {
-    if (!this.isResourcesReady) {
-      return;
-    }
-    this.isResourcesReady = false;
-    try {
-      if (this.captureSession) {
-        this.captureSession.stop();
-        this.captureSession.release();
-        this.captureSession = null;
-      }
-    } catch (err) {
-      console.error(TAG, 'release session:', JSON.stringify(err));
-    }
-    try {
-      if (this.cameraInput) {
-        this.cameraInput.close();
-        this.cameraInput = null;
-      }
-    } catch (err) {
-      console.error(TAG, 'release cameraInput:', JSON.stringify(err));
-    }
-    try {
-      if (this.previewOutput) {
-        this.previewOutput.release();
-        this.previewOutput = null;
-      }
-    } catch (err) {
-      console.error(TAG, 'release previewOutput:', JSON.stringify(err));
     }
   }
 
@@ -193,101 +137,14 @@ export struct AppLinkingTool {
     this.isScanning = true;
   }
 
-  private async initCameraAndScan(): Promise<void> {
-    try {
-      let context: common.UIAbilityContext | undefined = GlobalContextHolder.getInstance().uiAbilityContext;
-      if (!context) {
-        promptAction.showToast({ message: '无法获取上下文', duration: 1500 });
-        this.isScanning = false;
-        return;
-      }
-
-      let atManager: abilityAccessCtrl.AtManager = abilityAccessCtrl.createAtManager();
-      let appContext: common.ApplicationContext = context.getApplicationContext();
-      let tokenId: number = appContext.applicationInfo.accessTokenId;
-      let grantStatus: abilityAccessCtrl.GrantStatus = atManager.checkAccessTokenSync(tokenId,
-        'ohos.permission.CAMERA');
-
-      if (grantStatus !== abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
-        let result = await atManager.requestPermissionsFromUser(context, ['ohos.permission.CAMERA']);
-        if (result.authResults[0] !== abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED) {
-          promptAction.showToast({ message: '需要相机权限', duration: 1500 });
-          this.isScanning = false;
-          return;
-        }
-      }
-
-      let cameraManager: camera.CameraManager = camera.getCameraManager(context);
-      let cameras: Array<camera.CameraDevice> = cameraManager.getSupportedCameras();
-      if (!cameras || cameras.length === 0) {
-        promptAction.showToast({ message: '未找到可用相机', duration: 1500 });
-        this.isScanning = false;
-        return;
-      }
-
-      let targetCamera: camera.CameraDevice = cameras[0];
-      for (let i = 0; i < cameras.length; i++) {
-        if (cameras[i].cameraPosition === camera.CameraPosition.CAMERA_POSITION_BACK) {
-          targetCamera = cameras[i];
-          break;
-        }
-      }
-
-      this.cameraInput = cameraManager.createCameraInput(targetCamera);
-      await this.cameraInput.open();
-
-      let outputCapability: camera.CameraOutputCapability =
-        cameraManager.getSupportedOutputCapability(targetCamera);
-
-      if (!outputCapability.previewProfiles || outputCapability.previewProfiles.length === 0) {
-        promptAction.showToast({ message: '无可用预览配置', duration: 1500 });
-        this.isScanning = false;
-        return;
-      }
-      let previewProfile: camera.Profile = outputCapability.previewProfiles[0];
-      this.previewOutput = cameraManager.createPreviewOutput(previewProfile, this.surfaceId);
-
-      this.captureSession = cameraManager.createCaptureSession();
-      this.captureSession.beginConfig();
-      this.captureSession.addInput(this.cameraInput);
-      this.captureSession.addOutput(this.previewOutput);
-      this.captureSession.commitConfig();
-      await this.captureSession.start();
-      this.isResourcesReady = true;
-
-      let defaultDisplay: display.Display = display.getDefaultDisplaySync();
-      let viewControl: ScanViewControl = {
-        surfaceId: this.surfaceId,
-        width: defaultDisplay.width,
-        height: defaultDisplay.height
-      };
-
-      let scanOptions: scanBarcode.ScanOptions = {
-        scanTypes: [scanCore.ScanType.QR_CODE]
-      };
-      customScan.init(scanOptions);
-
-      customScan.start(viewControl, (err: BusinessError, results: Array<scanBarcode.ScanResult>) => {
-        if (err) {
-          console.error(TAG, 'Scan error:', JSON.stringify(err));
-          promptAction.showToast({ message: '扫码失败', duration: 1500 });
-        } else if (results && results.length > 0) {
-          let scannedText: string = results[0].originalValue;
-          this.inputUrl = scannedText;
-          this.parsedResult = URLParserUtil.parse(scannedText);
-          if (this.parsedResult.valid) {
-            promptAction.showToast({ message: '扫码成功', duration: 1000 });
-          }
-        }
-        this.onScanCancelled();
-      });
-
-    } catch (err) {
-      let error: BusinessError = err as BusinessError;
-      console.error(TAG, 'initCameraAndScan:', JSON.stringify(err));
-      promptAction.showToast({ message: '初始化失败: ' + (error.message || ''), duration: 2000 });
-      this.isScanning = false;
-      this.stopCamera();
+  private handleScanResult(text: string): void {
+    this.isScanning = false;
+    this.inputUrl = text;
+    this.parsedResult = URLParserUtil.parse(text);
+    if (this.parsedResult.valid) {
+      promptAction.showToast({ message: '扫码成功', duration: 1000 });
+    } else {
+      promptAction.showToast({ message: '未识别到有效链接', duration: 1500 });
     }
   }
 
@@ -304,83 +161,21 @@ export struct AppLinkingTool {
 
   build() {
     if (this.isScanning) {
-      this.ScanView();
+      ScanQrOverlay({
+        title: '扫码识别 App Linking',
+        onResult: (text: string) => {
+          this.handleScanResult(text);
+        },
+        onCancel: () => {
+          this.isScanning = false;
+        }
+      })
     } else {
       // 全局壁纸宿主：解析页继承主页壁纸背景（扫码页保持相机全屏不套用）
       WallpaperHost() {
         this.MainView();
       }
     }
-  }
-
-  @Builder
-  ScanView() {
-    Stack() {
-      XComponent({
-        id: 'cameraScanSurface',
-        type: 'surface',
-        controller: this.xCompController
-      })
-        .width('100%')
-        .height('100%')
-        .onLoad(() => {
-          this.surfaceId = this.xCompController.getXComponentSurfaceId();
-          this.initCameraAndScan();
-        })
-        .onDestroy(() => {
-          this.stopCamera();
-        })
-
-      Column() {
-        Text('扫码识别 App Linking')
-          .fontSize(20)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('sys.color.font_on_primary'))
-          .margin({ top: 48 })
-
-        Blank()
-
-        Column() {
-          Stack() {
-            Column()
-              .width('70%')
-              .height('40%')
-              .border({ width: 2, color: '#00FF66', style: BorderStyle.Dashed })
-              .borderRadius(16)
-              .opacity(0.8)
-          }
-          .width('100%')
-          .height('50%')
-          .alignContent(Alignment.Center)
-        }
-        .width('100%')
-        .layoutWeight(1)
-
-        Text('将二维码置于框内自动识别')
-          .fontSize(14)
-          .fontColor($r('sys.color.font_on_primary'))
-          .opacity(0.8)
-          .margin({ bottom: 24 })
-
-        Button('取消扫码')
-          .fontSize(16)
-          .fontColor($r('sys.color.font_on_primary'))
-          .backgroundColor('rgba(128, 128, 128, 0.2)')
-          .borderRadius(24)
-          .height(48)
-          .width('60%')
-          .margin({ bottom: 56 })
-          .onClick(() => {
-            this.onScanCancelled();
-          })
-      }
-      .width('100%')
-      .height('100%')
-      .alignItems(HorizontalAlign.Center)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('sys.color.background_primary'))
   }
 
   @Builder
@@ -555,7 +350,7 @@ export struct AppLinkingTool {
     .height('100%')
     .backgroundColor(Color.Transparent)
     // 滚动到末尾时最后一张卡片会贴到屏幕底部，避让系统手势条
-    .padding({ bottom: SafeArea.bottom() })
+    .padding({ bottom: this.safeBottom })
   }
 
   @Builder
