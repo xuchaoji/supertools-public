@@ -814,24 +814,28 @@ python tools/gen_icon_1024.py
 
 ### 7.4 常用构建命令
 
-| 脚本 | 关键参数 | 用途 |
-|---|---|---|
-| `build-dev.bat` | `product=dev` + `dev` 调试签名 | 本地开发，构建并安装 `.dev` 包 |
-| `build-ag-debug.bat` | `product=default` + `default` 调试签名 | AG 版本地验证，构建并安装 AG 包 |
-| `build-ag-release.bat` | `product=release` + `release` 发布签名 | 提审打包（仅构建，不安装） |
+| 脚本 | 关键参数 | 产物 | 用途 |
+|---|---|---|---|
+| `build-dev.bat` | `product=dev` + `dev` 调试签名 | `main\build\dev\outputs\dev\main-dev-signed.hap` | 本地开发，构建并安装 `.dev` 包 |
+| `build-ag-debug.bat` | `product=default` + `default` 调试签名 | `main\build\default\outputs\product\main-product-signed.hap` | AG 版本地验证，构建并安装 AG 包 |
+| `build-ag-release.bat` | `product=release` + `release` 发布签名 | `build\outputs\release\supertools-public-release-signed.app` | **提审打包（.app）**，仅构建不安装 |
 
 命令行等价：
 
 ```bash
-# dev（含悬浮工具）
+# dev（含悬浮工具，装到设备用 .hap）
 hvigorw --mode module -p module=main@dev -p product=dev -p buildMode=debug -p requiredDeviceType=phone assembleHap
 
-# AG 本地验证（悬浮入口隐藏）
+# AG 本地验证（悬浮入口隐藏，装到设备用 .hap）
 hvigorw --mode module -p module=main@product -p product=default -p buildMode=debug -p requiredDeviceType=phone assembleHap
 
-# AG 提审（发布签名）
-hvigorw --mode module -p module=main@product -p product=release -p buildMode=release -p requiredDeviceType=phone assembleHap
+# AG 提审（发布签名，产出 .app 上架包）
+hvigorw --mode project -p product=release -p buildMode=release -p requiredDeviceType=phone assembleApp
 ```
+
+> 注意区分打包格式：`assembleHap`（`--mode module`）产出的是 **.hap**（装真机用）；
+> `assembleApp`（`--mode project`）产出的是 **.app**（AppGallery 上架用）。
+> 上架上传的是 `.app`，不是 `.hap`。
 
 ---
 
