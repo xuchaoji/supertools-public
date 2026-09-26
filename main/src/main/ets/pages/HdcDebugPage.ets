@@ -1,7 +1,7 @@
 import { HMRouter, HMRouterMgr } from "@hadss/hmrouter";
 import hilog from "@ohos.hilog";
 import { PreferencesUtil } from "@pura/harmony-utils";
-import { HdcService, HdcShellResult } from "../utils/HdcService";
+import { HdcService, HdcShellResult, HDC_BUSY_EXIT_CODE } from "../utils/HdcService";
 import { SpKeys } from "../constant/SpKeys";
 import { connection } from "@kit.NetworkKit";
 import { KeyCode } from "@kit.InputKit";
@@ -67,7 +67,8 @@ export struct HdcDebugPage {
   @Local showLogManager: boolean = false;
   private lastCaptureEnd: number = 0;
   private scroller: Scroller = new Scroller();
-  private hdcService: HdcService = new HdcService();
+  /** 全局单例：所有页面共用同一命令队列，避免 native 进程级状态串线。 */
+  private hdcService: HdcService = HdcService.getInstance();
   private entrySeq: number = 0;
   /** 沉浸光感：跟随系统深/浅色模式，驱动文字阴影保证任意壁纸背景可读 */
   @Local isDark: boolean = false;
@@ -265,6 +266,12 @@ export struct HdcDebugPage {
       if (out) { out.split("\n").filter(l => l).forEach(l => this.addOutput(l)); }
       if (err) { err.split("\n").filter(l => l).forEach(l => this.addError(l)); }
       if (!out && !err) { this.addSystem("(no output)"); }
+      // 真实退出码优先展示，便于区分“命令失败”与“命令无输出”
+      if (r.exitCode === HDC_BUSY_EXIT_CODE) {
+        this.addError("hdc busy: previous command still running in native layer");
+      } else if (r.exitCode !== 0) {
+        this.addError("exit code: " + r.exitCode);
+      }
     }
     const suffix: string = (r.exitCode !== 0 && !r.timedOut && !r.cancelled) ? "  exit: " + r.exitCode : "";
     this.addMeta("⏱ " + this.formatDuration(r.durationMs) + suffix);

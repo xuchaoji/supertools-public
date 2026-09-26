@@ -1,0 +1,11 @@
+{
+  // 这个 mock 包声明让 ArkTS/IDE 能把 `import ... from 'libhdc_z.so'` 解析到 Index.d.ts。
+  // 缺了它：hvigor 命令行还能编译（对 .so 有宽松处理），但 IDE 的 ArkTSCheck 会一直报
+  // "Cannot find module 'libhdc_z.so' or its corresponding type declarations."
+  // 同时需要在 main/oh-package.json5 的 dependencies 里加：
+  //   "libhdc_z.so": "file:./src/main/cpp/types/libhdc_z"
+  "name": "libhdc_z.so",
+  "types": "./Index.d.ts",
+  "version": "1.0.0",
+  "description": "Native HDC bridge (hdctools/napi.cpp)"
+}

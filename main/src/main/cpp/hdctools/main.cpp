@@ -27,13 +27,35 @@ bool GetCommandlineOptions(int optArgc, const char *optArgv[]);
 
 extern bool g_show;
 
-static string envOr(const char *name, const string &def)
+static string pathOr(const char *value, const string &def)
 {
-    const char *v = getenv(name);
-    return (v != nullptr && *v != '\0') ? string(v) : def;
+    return (value != nullptr && *value != '\0') ? string(value) : def;
 }
 
-int cmd(int argc, const char *argv[], const char *tempPath)
+// hdc 协议的客户端路径没有退出码通道（RunClientMode 恒返回 0），
+// 失败只体现为 "[Fail]..." 文本。为了不让 ArkTS 侧永远看到 exitCode=0，
+// 这里把 hdc 自己的失败标记翻译成非零退出码。
+// 注意：这是基于文本的保守判断，仅匹配行首的 "[Fail]"。
+static bool outputHasFailureMarker(const string &path)
+{
+    FILE *fp = fopen(path.c_str(), "r");
+    if (fp == nullptr) {
+        return false;
+    }
+    bool failed = false;
+    char line[512];
+    while (fgets(line, sizeof(line), fp) != nullptr) {
+        if (strncmp(line, "[Fail]", 6) == 0) {
+            failed = true;
+            break;
+        }
+    }
+    fclose(fp);
+    return failed;
+}
+
+int cmd(int argc, const char *argv[], const char *tempPath,
+    const char *outPathArg, const char *errPathArg)
 {
     HDCZ_LOG("cmd() start, argc=%{public}d", argc);
     mkdir(tempPath, 0755);
@@ -41,10 +63,10 @@ int cmd(int argc, const char *argv[], const char *tempPath)
     Hdc::Base::SetTempDir(tempPath);
     Hdc::Base::SetLogLevel(Hdc::LOG_OFF);
 
-    // Output files may be overridden per-command (see napi.cpp) so that a
-    // cancelled/timed-out command never clobbers the next command's output.
-    string outPath = envOr("HDC_OUT_PATH", string(tempPath) + "hdc.out");
-    string errPath = envOr("HDC_ERR_PATH", string(tempPath) + "hdc.err");
+    // Output files are per-command (see napi.cpp) so that a cancelled/timed-out
+    // command never clobbers the next command's output.
+    string outPath = pathOr(outPathArg, string(tempPath) + "hdc.out");
+    string errPath = pathOr(errPathArg, string(tempPath) + "hdc.err");
     int outFd = open(outPath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
     int savedStdout = -1;
     if (outFd >= 0) {
@@ -73,8 +95,11 @@ int cmd(int argc, const char *argv[], const char *tempPath)
     bool pull = false;
     g_show = true;
     HDCZ_LOG("cmd() RunClientMode(addr=%{public}s)", addr.c_str());
-    Hdc::RunClientMode(commands, addr, key, pull);
-    HDCZ_LOG("cmd() done");
+    // 真实退出码必须回传，否则 ArkTS 侧永远看到 0，无法区分成功与失败。
+    // 注意：hdc 协议层目前只区分 0 / -1（无 shell 退出码通道），
+    // 因此这里能区分的是“客户端执行成功”与“连接或命令失败”。
+    int ret = Hdc::RunClientMode(commands, addr, key, pull);
+    HDCZ_LOG("cmd() done ret=%{public}d", ret);
 
     if (outFd >= 0) {
         fflush(stdout);
@@ -95,7 +120,10 @@ int cmd(int argc, const char *argv[], const char *tempPath)
         close(errFd);
     }
     Hdc::Base::RemoveLogCache();
-    return 0;
+    if (ret == 0 && (outputHasFailureMarker(outPath) || outputHasFailureMarker(errPath))) {
+        ret = 1;
+    }
+    return ret;
 }
 int server(const char *tempPath)
 {

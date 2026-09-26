@@ -2,6 +2,8 @@
 #include "hdc.h"
 #include <atomic>
 #include <thread>
+#include <mutex>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
@@ -52,6 +54,15 @@ static const char** vector_to_const_argv(const std::vector<std::string>& vec) {
 
 static std::atomic<uint64_t> g_cmdSeq{0};
 
+// `cmd()` is not reentrant: it redirects the process-wide stdout/stderr, swaps
+// the temp dir and argv, and reads process env. Two concurrent commands would
+// corrupt each other's output, so the native side enforces single-flight even
+// if a caller bypasses the ArkTS queue.
+static std::timed_mutex g_cmdMutex;
+static constexpr int CMD_LOCK_WAIT_MS = 5000;
+/** Another command still holds the native hdc state. */
+static constexpr int CMD_BUSY_RET = -2;
+
 static napi_value HdcCmd(napi_env env, napi_callback_info info) {
     HDCZ_LOG("hdcCmd called");
     size_t argc = 3;
@@ -86,13 +97,18 @@ static napi_value HdcCmd(napi_env env, napi_callback_info info) {
 
     std::thread t([](std::vector<std::string> p, std::string tdir,
         std::string oPath, std::string ePath, napi_threadsafe_function tsfn) {
-        setenv("HDC_OUT_PATH", oPath.c_str(), 1);
-        setenv("HDC_ERR_PATH", ePath.c_str(), 1);
-        const char** argv = vector_to_const_argv(p);
-        int ret = cmd(static_cast<int>(p.size()), argv, tdir.c_str());
-        delete[] argv;
-        unsetenv("HDC_OUT_PATH");
-        unsetenv("HDC_ERR_PATH");
+        int ret = 0;
+        {
+            std::unique_lock<std::timed_mutex> lock(g_cmdMutex, std::defer_lock);
+            if (!lock.try_lock_for(std::chrono::milliseconds(CMD_LOCK_WAIT_MS))) {
+                HDCZ_LOG_ERR("hdcCmd worker: native cmd() still busy, returning %{public}d", CMD_BUSY_RET);
+                ret = CMD_BUSY_RET;
+            } else {
+                const char** argv = vector_to_const_argv(p);
+                ret = cmd(static_cast<int>(p.size()), argv, tdir.c_str(), oPath.c_str(), ePath.c_str());
+                delete[] argv;
+            }
+        }
         HDCZ_LOG("hdcCmd worker: ret=%{public}d", ret);
         auto* cb = new int(ret);
         napi_call_threadsafe_function(tsfn, cb, napi_tsfn_blocking);

@@ -616,31 +616,109 @@ BackgroundServiceManager.stopRecordingTask();
 - 发布常驻通知 (`isOngoing: true`, `isUnremovable: true`)
 - 通知 ID: `10001`
 
+**唯一 owner 原则（重要）**：
+
+系统连续后台任务（`startBackgroundRunning` / `stopBackgroundRunning`）**只允许本类调用**。
+历史上存在三个 owner 互相踩踏，已统一：
+
+| 曾经的 owner | 现状 |
+|---|---|
+| `MainAbility.startContinuousTask/stopContinuousTask` | **已删除**。`onForeground()` 曾无条件 `stopBackgroundRunning`，会撤销仍在运行的 Web/录屏保活，是 `9800005 application has not applied for a continuous task` 的直接来源 |
+| `utils/BackgroundTaskUtil.ets` | **已删除**（无业务调用的残留实现，另有独立 `isRunning` 标志） |
+| `BackgroundServiceManager` | 保留，唯一入口 |
+
+**状态机与串行化**：
+
+```typescript
+// 业务状态（谁在跑）
+private static isServerRunning: boolean;
+private static isRecording: boolean;
+// 系统任务真实状态（只在系统调用成功后更新）
+private static taskActive: boolean;
+private static currentMode: number;
+// 串行化 Web 与录屏的并发切换
+private static transitionQueue: Promise<void>;
+```
+
+- 两个业务标志都为 false 时**先判断 `taskActive`**，没有活动任务就只撤通知、不调系统 stop
+  → 从根本上消除 `9800005`（重复停止 / 从未申请就停止）
+- 串行化：Web 与录屏同时 start/stop 时按队列顺序执行，避免异步互相覆盖
+- 模式切换（DATA_TRANSFER ↔ AUDIO_RECORDING）：先 stop 旧模式、清状态，再 start 新模式
+- `isServerRunning` / `isRecording` 表示业务意图；`taskActive` / `currentMode` 表示系统事实，**不要用前者推断后者**
+
+**Web 服务自动恢复也须通知本类**：`MainAbility.restoreSavedState()`、`restoreDefaults()`、`PrivacyPage`
+三处在 `WebServerUtil.start()` 之后都会调用 `BackgroundServiceManager.startWebServer(ip)`，
+否则「Web 在跑但没有长时任务」——服务容易被系统冻结。
+
 ### 6.9 WebServerUtil (本地 HTTP 服务器)
 
 ```typescript
 import { WebServerUtil } from '../utils/WebServerUtil';
 
 const server = WebServerUtil.getInstance();
-server.init(filesDir + '/webroot', 8088);  // 根目录 + 端口
-server.start();   // 启动 TCP Socket Server 监听
-server.stop();    // 关闭
-server.getIpAddress();  // WiFi IP (wifiManager.getIpInfo())
-server.isRunning;       // 运行状态
+server.init(filesDir + '/wwwroot', 8088);   // 根目录 + 端口（会顺带恢复/生成访问令牌）
+server.start();          // 启动 TCP Socket Server 监听
+server.stop();           // 关闭
+server.getIpAddress();   // WiFi IP (wifiManager.getIpInfo())
+server.getAccessUrl();   // 带 token 的局域网访问地址（页面展示/复制用）
+server.token;            // 当前访问令牌
+server.isRunning;        // 运行状态
+
+// 单次上传/下载上限（MB），默认 200；页面「单次传输上限」菜单可改并持久化
+server.setMaxTransferMb(200);
+server.maxTransferMb;    // => 200
 
 // 频控
-server.setRateLimit('/api/data', 1); // 限制每分钟 1 次
-server.getRateLimitMinutes('/api/data'); // 获取频控分钟数
+server.setRateLimit('/path/file', 1);        // 限制 1 分钟 1 次
+server.getRateLimitMinutes('/path/file');
 ```
 
+**访问鉴权（默认开启）**：
+
+- 启动时从 `SpKeys.WEB_SERVER_TOKEN` 读取令牌，缺失则生成并写回（`restoreOrCreateToken()`）。
+  令牌在 `init()` 内即就绪，因此 `MainAbility` / `PrivacyPage` 在用户打开页面前自动启动 Web 服务时
+  **不存在无鉴权窗口**。
+- 校验通道：请求头 `X-Access-Token`，或查询参数 `?token=`（应用内预览、目录列表链接都用后者）。
+- 未通过 → `401`。刷新令牌后旧的局域网链接立刻失效。
+- 明文 HTTP 无 TLS：token 防的是同网段误访问与跨站读取，**不防抓包**。
+- 已移除 `Access-Control-Allow-Origin: *`（否则任意网页可跨站读取整个 wwwroot）。
+
+**请求处理（流式，内存与文件大小解耦）**：
+
+| 阶段 | 行为 |
+|---|---|
+| header | 累积上限 16KB，超出 → `431`；只在 header 阶段做小缓冲 |
+| body（上传） | `/api/upload` 在 header 解析后即打开目标 fd，后续分片**直接 `writeSync` 落盘**，不再累积整包 |
+| body（其他 POST） | 只缓存 1MB 用于回显，超出标记 `received_data = "[Body Too Large]"` |
+| 下载 | `sendFileAsync()` 以 64KB 分片流式发送，峰值内存 O(64KB) |
+
+> 旧实现每收到一个 TCP 分片就重新拼接整个历史缓冲（O(n²)），并在下载时把整个文件读进内存；
+> 200MB 上传在旧实现下会产生数百 GB 的 memcpy 和 GB 级堆占用，实际不可用。
+
+**错误码语义**（都是显式返回，不再静默等待）：
+
+| 码 | 触发条件 |
+|---|---|
+| `400` | `Content-Length` 非十进制（旧实现解析成 `NaN` 会让同一请求被反复响应） |
+| `401` | 缺少/错误的 token |
+| `403` | 路径越界（见 §13.5） |
+| `404` | 文件/目录不存在 |
+| `405` | 非 GET/POST |
+| `411` | `Transfer-Encoding: chunked`（不支持，显式拒绝而不是挂起） |
+| `413` | `Content-Length` 或实际字节数超过 `maxTransferBytes`；下载文件超过上限同样 413 |
+| `429` | 命中文件频控 |
+| `431` | 请求头超过 16KB |
+
 **功能细节：**
-- 目录列表页面 (含拖拽上传区域 + 文件选择 + 文件夹选择)
-- `/api/upload` POST 接口 (通过 `X-File-Path` 头指定目标路径，批量上传)
-- MIME 类型识别 (html/js/css/json/txt/png/jpg)
-- 路径遍历防护 (`..` 检测 → 403)
+- 目录列表页面 (含拖拽上传区域 + 文件选择 + 文件夹选择)，文件名与路径经 `escapeHtml()` 转义（防存储型 XSS）
+- `/api/upload` POST 接口 (通过 `X-File-Path` 头指定目标路径，批量上传)，成功响应 `{"code":200,"msg":"Success"}` 保持不变
+- 目录列表优先返回 `index.html`
+- MIME 类型识别（html/js/css/json/txt/md/csv/png/jpg/gif/webp/svg/mp4/pdf），文本类带 `; charset=utf-8`
+- 响应统一带 `X-Content-Type-Options: nosniff` + `Cache-Control: no-store` + `Connection: close`
 - 文件频控限速 (path → lastAccess 检查，超限返回 429)
-- `AppStorage.setOrCreate('RecentAccessFile', fileName)` 推送最近访问
-- TCP 粘包处理: `tryProcessRequest` 通过 `Content-Length` 头判断是否接收完整
+- `AppStorage.setOrCreate('RecentAccessFile', fileName)` 推送最近访问（悬浮球依赖此键）
+- 页面内 `openPreview()` 用 `http://127.0.0.1:<port>/<path>?token=<token>`，预览同样带令牌
+
 
 ### 6.10 共享偏好与上下文
 
@@ -727,6 +805,76 @@ struct StressCapsule {
 }
 ```
 
+### 6.14 HdcService (内置 HDC 终端)
+
+`libhdc_z.so`（`main/src/main/cpp/hdctools/`，基于裁剪的 hdctools_src）的 ArkTS 封装。
+
+```typescript
+import { HdcService, HDC_BUSY_EXIT_CODE } from '../utils/HdcService';
+
+const hdc = HdcService.getInstance();   // 全进程唯一
+hdc.startServer();                      // 在进程内拉起 hdcd，监听 127.0.0.1:18710
+await hdc.waitForServerReady(6000, 250);// 真实 TCP 探活，替代固定延时
+const r = await hdc.execCommand('list targets -v', 30000);
+// r.exitCode / r.stdout / r.stderr / r.durationMs / r.timedOut / r.cancelled / r.error
+hdc.cancel();                           // 取消「当前正在执行」的命令
+```
+
+**为什么必须是单例 + 队列**：
+
+native 的 `cmd()` **不可重入**——它重定向进程级 stdout/stderr（`dup2`）、改 `g_tempDir` / `g_show` / `argv`。
+因此：
+
+1. ArkTS 侧所有命令经 `HdcService.getInstance()` 的同一队列串行执行；
+2. 每条命令持有一个私有 `ExecState`，**迟到的 native 回调只能结算自己那条命令**
+   （旧实现用 4 个实例字段表示「唯一在飞命令」，A 超时后 B 开始，A 的回调会清掉 B 的定时器并用 A 的 runDir 结算 B 的 promise）；
+3. native 侧另有一把 `std::timed_mutex` 单飞保护，5 秒拿不到锁返回 `-2`，避免 `shell hilog` 这类永不退出的命令把后续命令焊死。
+
+**输出隔离**：每条命令有自己的 `run_<seq>/hdc.out|hdc.err`，由 native 显式接收路径参数
+（不再用 `setenv` 传路径——那是进程级共享状态，多线程下会串线）。ArkTS 读完即清理 `run_<seq>/`。
+
+**退出码**：
+
+- `cmd()` 返回 `RunClientMode()` 的真实结果，不再硬编码 `return 0`。
+- hdc 协议层没有 shell 退出码通道（上游 `ExecuteCommand` 只返回 `0/-1`），
+  因此适配层额外把 hdc 自己的失败标记（**行首 `[Fail]`**）翻译成退出码 `1`
+  → 例如 `tconn 192.0.2.1:8710` 现在报告 `exit: 1`，而不是永远 `0`。
+- `-1` 表示原生异常/超时/取消（`timedOut` / `cancelled` 标志可进一步区分），`-2` 表示 native busy。
+- 局限：Cancel 不会终止已经在 native 线程里跑的 hdc 会话（`-2` 是兜底，不是真正的中断）。
+
+**target 门控与懒启动**：
+
+- 入口可见性**沿用原有规则**（`HomePage.aboutToAppear`）：
+  - `dev` / `default` 目标：默认可见；
+  - AG 上架版（`IS_AG_TARGET = true`）：**默认隐藏**，需要「设置页连点彩蛋」
+    （`handleSettingsEasterEgg`，5 秒内在设置 tab 连点 8 次）写入 `ENABLE_HDC_VISIBLE` 后才出现。
+    > AG 包**保留**该能力，不要用常量把它硬关掉。
+- `TargetConstants.HDC_DEBUG_ENABLED` 是**显式总闸**（三个 target 均为 `true`）；
+  只有确实要在某个 target 上彻底移除该能力时才改成 `false`。
+- `MainAbility.onCreate` **不再**启动 hdcd；服务在首次进入 HDC 页面
+  （`HdcDebugPage.aboutToAppear` → `startServer()`）时才拉起。
+  > 副作用：冷启动后 PC 上的 `hdc` 连不上设备的 18710，需先打开一次 HDC 页面。
+
+**类型声明必须放在约定位置（踩过的坑）**：
+
+`import nativeHdc from 'libhdc_z.so'` 的声明文件**只能**放在：
+
+```
+main/src/main/cpp/types/libhdc_z/Index.d.ts
+```
+
+这是 hvigor 里 `BuildDirConst.CPP_TYPES` 对应的约定（`src/main/cpp/types/<库名>/Index.d.ts`），
+也是 DevEco 新建 Native C++ 模块的模板布局。历史上声明被放在
+`cpp/hdctools/libhdc_z/Index.d.ts` 与 `ets/types/libhdc_z.d.ts` 两处非约定位置，后果是：
+
+- **命令行 `hvigorw` 能编译通过**（递归扫描到了那份声明）；
+- **DevEco 编辑器一直报** `Cannot find module 'libhdc_z.so' or its corresponding type declarations. <ArkTSCheck>`
+  ——即「构建绿、IDE 红」，很容易被误判成编译失败。
+
+> 判断口诀：`<ArkTSCheck>` 标记 = IDE 检查器；hvigor 报错通常是 `ArkTS Compiler Error` + 错误码。
+> 两者同时出现才需要 `-Clean` 清缓存；只有前者先检查声明文件位置。
+> 新增 native 库时照约定放声明，不要再往 `ets/types/` 或 CMake 子目录里塞。
+
 ---
 
 ## 7. 构建系统
@@ -754,6 +902,30 @@ struct StressCapsule {
 > Project Structure → Signing Configs 点 **Fix** 自动重生成，无需手改密码。
 > 发布签名只在「打上架包」时用，平时不要碰。旧文件 `build-profile-pad-release.json5` 已废弃，
 > 其内容已并入本文件 `release` 签名/产品。
+
+**`build-profile.json5` 不纳入版本控制**（`.gitignore` 已忽略）：
+
+该文件含**仅属于本机**的签名绝对路径与 DevEco 生成的机器绑定加密口令，提交它既无移植价值
+（换机器的绝对路径必然失效），又泄露本机路径与口令串。仓库改为提交
+`build-profile.template.json5`（占位符 + 注释）：
+
+```bash
+# 方式一：用 DevEco Studio 打开工程，在 Signing Configs 勾选自动签名，IDE 会生成本地文件
+# 方式二：复制模板并填入本机路径与口令
+copy build-profile.template.json5 build-profile.json5
+```
+
+| 文件 | 状态 | 说明 |
+|---|---|---|
+| `build-profile.json5` | 本机、忽略 | 实际参与构建的 profile |
+| `build-profile.template.json5` | 提交 | 结构模板与填写说明 |
+| `oh-package-lock.json5` | **提交** | 锁定依赖解析结果，避免 caret 范围漂移 |
+
+> `sign/` 同样被忽略，内含 release 签名材料与 hvigor 的**签名材料解密缓存** `sign/material/`——
+> 缓存与具体 keystore/路径绑定，所以不能把材料换个目录再指望相对路径能签过
+> （实测：把 release 材料放到 `sign/local/` 后会报 `ENOENT ... sign/local/material`）。
+> release 签名配置本身已改为工程相对路径（`./sign/...`，可用）；default/dev 仍指向
+> `~/.ohos/config/`，由 DevEco 管理。
 
 ### 7.2 源集覆盖
 
@@ -838,6 +1010,70 @@ hvigorw --mode project -p product=release -p buildMode=release -p requiredDevice
 > `assembleApp`（`--mode project`）产出的是 **.app**（AppGallery 上架用）。
 > 上架上传的是 `.app`，不是 `.hap`。
 
+### 7.5 构建后自检脚本
+
+```powershell
+# 全部三条构建链 + 发布卫生检查
+pwsh -File tools/verify_build.ps1
+
+# 追加：从零构建（先清 build/.cxx）+ 上架 .app 打包
+pwsh -File tools/verify_build.ps1 -Clean -IncludeApp
+
+# 追加真机冒烟（安装 dev 包、冷启动、长时任务日志、Web 鉴权）
+pwsh -File tools/verify_build.ps1 -Device 192.168.3.144:12345
+
+# 只跑检查、不重新编译
+pwsh -File tools/verify_build.ps1 -SkipBuild -Device 192.168.3.144:12345
+```
+
+覆盖的三条构建链（**必须全部覆盖**，只测 dev + release 会漏掉 DevEco 默认选中的产品）：
+
+| 链 | 命令 | 产物 |
+|---|---|---|
+| dev | `module=main@dev product=dev buildMode=debug` | `main/build/dev/outputs/dev/main-dev-signed.hap` |
+| ag-debug | `module=main@product product=default buildMode=debug` | `main/build/default/outputs/product/main-product-signed.hap` |
+| ag-release | `module=main@product product=release buildMode=release` | `main/build/release/outputs/product/main-product-signed.hap` |
+| 上架 .app | `--mode project product=release buildMode=release assembleApp` | `build/outputs/release/*.app` |
+
+其余检查项（任一失败退出码非 0，可用作 CI 门禁）：
+
+| 类别 | 检查 |
+|---|---|
+| 环境 | `DEVECO_HOME`、`hvigorw`、本地 profile 存在、lockfile 已提交、profile 未被跟踪 |
+| 哈希 | release 原生构建**不含** `TEST_HASH`；`hdc_hash_gen.h` 已生成且为 32 位十六进制；dev 按预期含 `TEST_HASH` |
+| 产物 | 三个 HAP 均存在、**不含** `libhdc_napi.so`（已删除的 Rust 实现）、含 `libhdc_z.so` |
+| 真机 | 安装成功、进程存活、冷启动无 `9800005`、Web 服务已启动、长时任务已申请、无 token → 401 |
+
+> **锁屏设备无法用命令拉起应用**：`aa start` 会返回
+> `10106102 The device screen is locked during the application launch`（开发者模式下不会自动解锁）。
+> 此时脚本会打印 `[SKIP]` 并跳过运行时检查，而不是误报失败；解锁设备后重跑
+> `pwsh -File tools/verify_build.ps1 -SkipBuild -Device <ip:port>` 即可补上这部分。
+
+> 之所以不做「GitHub Actions 式 CI」：构建需要 DevEco SDK 与 hvigor，标准托管 runner 上没有；
+> 这个脚本在装了 DevEco 的机器（含自建 runner）上可直接作为门禁使用。
+
+#### 7.5.1 陈旧缓存导致的假故障（务必先看这条）
+
+**症状**：某个产品编译失败，报 `Cannot find module 'libhdc_z.so' or its corresponding type declarations.`
+（DevEco 里带 `<ArkTSCheck>` 标记），并伴随
+`ENOENT: ... loader_out/<target>/ets/sourceMaps.map`，但同一份代码在别的产品下能编译通过。
+
+**原因**：`main/.cxx/<product>/<target>/<buildMode>/` 与 `main/build/<product>/` 是**按产品分开**的缓存。
+改了 CMake 配置（例如本轮把 `base.h` 的 `configure_file` 目标从源码树改到 build 目录、
+调整 `include_directories` 顺序）后，旧产品目录里残留的原生构建中间态/原生库清单会让 ArkTS 侧的
+`.so` 模块解析失败——即使 CMake 自己重跑过配置。
+
+**处理**（实测有效，AG 调试包由此恢复）：
+
+```powershell
+Remove-Item -Recurse -Force main\build\default, main\.cxx\default
+# 或直接全清（-Clean 等价于此）：
+pwsh -File tools/verify_build.ps1 -Clean
+```
+
+**排查经验**：先用 `-Clean` 重跑一次再判断是不是代码问题；跨产品比较时不要只看 dev——
+**dev 通过不代表 `product=default` 通过**，两者的原生构建目录与源集都不同。
+
 ---
 
 ## 8. 特性标志 (Feature Flags)
@@ -849,14 +1085,28 @@ hvigorw --mode project -p product=release -p buildMode=release -p requiredDevice
 export class TargetConstants {
   public static readonly HAS_FLOATING_PERM: boolean = true;
   public static readonly IS_AG_TARGET: boolean = false;
+  public static readonly WEB_SERVER_AUTO_START: boolean = true;
+  public static readonly HDC_DEBUG_ENABLED: boolean = true;
 }
 
 // product 源集 (AG 上线版本)
 export class TargetConstants {
   public static readonly HAS_FLOATING_PERM: boolean = false;
   public static readonly IS_AG_TARGET: boolean = true;
+  public static readonly WEB_SERVER_AUTO_START: boolean = false;
+  public static readonly HDC_DEBUG_ENABLED: boolean = false;
 }
 ```
+
+| 标志 | 作用 |
+|---|---|
+| `HAS_FLOATING_PERM` | 悬浮窗相关入口 |
+| `IS_AG_TARGET` | AG 上架版逻辑分支（悬浮/压测卡片等） |
+| `WEB_SERVER_AUTO_START` | 未手动设置过时，Web 服务是否默认自动启动 |
+| `HDC_DEBUG_ENABLED` | 内置 HDC 终端的**显式总闸**（三个 target 均 `true`）。入口的日常显隐规则见 §6.14：dev 默认可见、AG 默认隐藏靠连点彩蛋解锁 |
+
+> `HDC_DEBUG_ENABLED` 是上架必需项：内置 hdcd 会监听本机端口并暴露调试能力，
+> 上架包不应带有该入口。
 
 **使用方式：**
 ```typescript
@@ -1042,6 +1292,27 @@ $r('app.string.setting_tab')
 - **忽略路径**: `ohosTest`, `test`, `mock`, `node_modules`, `oh_modules`, `build`, `.preview`
 - **构建严格模式**: `caseSensitiveCheck: true`, `useNormalizedOHMUrl: true`
 - **无测试文件**: 项目中无现有测试，但依赖 `@ohos/hypium` (测试框架) 和 `@ohos/hamock` (mock 框架) 可用于未来的测试编写
+- **可执行的自检**: `tools/verify_build.ps1`（§7.5）把构建与安全约定固化为断言，任一失败即非 0 退出
+
+**本地 Web 服务（对外暴露面，改动前请对照 §6.9 / §13.5）**：
+
+| 关注点 | 约定 |
+|---|---|
+| 鉴权 | 默认启用随机 token；无 token → 401；**不要**恢复 `Access-Control-Allow-Origin: *` |
+| 路径 | 一律经 `resolveSafePath()`；先解码后校验必错 |
+| 输出 | 目录列表/文件名必须转义 |
+| 上限 | header 16KB、单请求/单文件上限可配置（默认 200MB）；新增读文件路径必须复用同一上限 |
+| 内存 | 上传直接落盘、下载分片发送；**不要**再引入「整包读入内存」的写法 |
+
+**内置 HDC（调试能力，不得进入上架包）**：
+
+| 关注点 | 约定 |
+|---|---|
+| target 门控 | `TargetConstants.HDC_DEBUG_ENABLED`，product 为 `false` |
+| 启动时机 | 懒启动（进入 HDC 页面），不在 `onCreate` 里拉起 |
+| 并发 | 只能经 `HdcService.getInstance()` 的队列发命令；native 侧另有 `timed_mutex` 兜底 |
+| release 哈希 | 不得出现 `TEST_HASH`；由 CMake 按 `CMAKE_BUILD_TYPE` 分流（§13.8） |
+| 产物 | 不得再打包已删除的 `libhdc_napi.so`（Rust 旧实现） |
 
 ---
 
@@ -1197,9 +1468,17 @@ export class SpKeys {
 - `pages/FloatBallPage.ets` 第 81 行: `let targetY = this.startWinY + deltaY_px;` 应为 `deltaY_px`（变量名错误，导致 Y 轴拖拽偏移异常）
 - `model/RecordModel.ets`: 属性名 `fineName` 应统一为 `fileName`（多处引用中使用 `.fineName` 而非 `.fileName`）
 
-### 13.5 路径安全
-- WebServerUtil 中检查 `..` 防路径遍历，但仅在 POST `/api/upload` 中做了检查；GET 请求中也需检查
-- 所有文件路径操作需处理 `file://` 前缀的添加/剥离
+### 13.5 Web 服务与路径安全
+- 路径校验统一走 `WebServerUtil.resolveSafePath()`：**逐段解码后再校验**，
+  拒绝 `..`、段内 `/` `\` `:` `NUL`，返回 `null` 时响应 403。
+  必须先解码再查（旧实现先查 `..` 再解码，`%2e%2e%2f` 可直接绕过）；
+  也不能整串解码后再查（`%2F` 会变成真实分隔符），逐段解码是唯一同时封堵两条路径的形式。
+- 所有入口（GET / 通用 POST / `/api/upload` 的 `X-File-Path`）都必须经过它；历史上通用 POST 漏检 = 任意文件读。
+- 目录列表输出必须 `escapeHtml()`，否则恶意文件名（HarmonyOS 允许 `<`）构成存储型 XSS。
+- 局域网访问默认需要 token（`X-Access-Token` 或 `?token=`），未通过返回 401；
+  页面展示与复制的都是带 token 的 `getAccessUrl()`。
+- 单次上传/下载上限默认 200MB（`setMaxTransferMb`），超限 413；header 上限 16KB（431）。
+- 所有文件路径操作需处理 `file://` 前缀的添加/剥离。
 
 ### 13.6 循环依赖
 - `MyAVScreenCapture` 通过**方法内动态获取** `RecordViewModel.getInstance()` 避免循环导入
@@ -1207,3 +1486,33 @@ export class SpKeys {
 
 ### 13.7 FloatBallPage 拖拽坐标问题
 - 第 81 行 `let targetY = this.startWinY + deltaY_px;` 存在明显错误：第四个参数应该是 `deltaY_px` 而非 `deltaY_px`。实际上当前写法导致 Y 轴偏移使用了 X 轴的位移增量，而非 Y 轴的位移增量。
+
+### 13.8 HDC 原生构建与握手哈希
+- `hdctools/CMakeLists.txt` 按 `CMAKE_BUILD_TYPE` 分流：`Debug` 用固定测试常量（`-DTEST_HASH -DHDC_MSG_HASH="TEST"`），
+  **其他构建必须用源码派生的哈希**——由 CMake 对 `hdctools_src` 与本地适配层源码算 SHA256，
+  生成 `hdc_hash_gen.h` 到 build 目录（源码里 `#include "hdc_hash_gen.h"` 位于 `#ifndef TEST_HASH` 之内，两者互斥）。
+- 因此**不能简单删掉 `-DTEST_HASH`**：该头不存在时 `client.cpp` / `session.cpp` / `server_for_client.cpp` 会直接编译失败。
+- 判据必须用 `CMAKE_BUILD_TYPE`，**不能用 `NDEBUG`**——hvigor 把 `CMAKE_CXX_FLAGS_RELEASE` 置空了。
+- `hdctools/CMakeLists.txt` 用 `configure_file` 把本地 `base.h` 输出到 **build 目录**（以 BEFORE 加入 include 路径），
+  不再写回被跟踪的 `hdctools_src/source/src/common/base.h`，避免每次构建弄脏源码树。
+- 本地 `hdctools/base.cpp` 的 `PrintMessage` 不再额外写 `g_tempDir + "hdc.out"`：那是进程级共享、只追加不清理、
+  ArkTS 从不读取的文件；stdout 已被 `cmd()` 重定向到本次命令的 `run_<seq>/hdc.out`，重复写入只会跨命令交错并无上限增长。
+
+### 13.9 后台连续任务（长时任务）陷阱
+- **不要在任何生命周期回调里无条件 `stopBackgroundRunning`**：`MainAbility.onForeground` 曾经这么做，
+  结果是「Web/录屏仍在跑，但保活被撤销」，且冷启动必报
+  `Continuous Task verification failed / application has not applied for a continuous task (9800005)`。
+- 停止前必须先确认系统里**确实有**活动任务（`BackgroundServiceManager.taskActive`）；
+  没有活动任务就只撤通知。
+- 同一时刻只允许一个 owner 直接调用 `backgroundTaskManager`（见 §6.8）。
+- 服务自动恢复（`restoreSavedState` / `restoreDefaults` / 隐私同意后启动 Web）也必须调用
+  `BackgroundServiceManager.startWebServer()`，否则出现「服务在跑、无长时任务」的静默失配。
+
+### 13.10 release 构建卫生现状
+- `main/build-profile.json5` 的 release `buildOptionSet` 中 `obfuscation.enable = false`：
+  **release 目前不混淆**。若要打开，需先确认 HMRouter 等基于字符串/反射的机制不受影响，
+  并同步维护 `obfuscation-rules.txt`，属于独立改动。
+- `build-profile-pad-release.json5` 等按设备形态区分的 profile 是本机文件（被忽略）；
+  其中模块 target 名必须是 `main/build-profile.json5` 里声明过的 `product` / `dev`。
+- 构建后自检请跑 `tools/verify_build.ps1`（见 §7.5），它把上述约定固化成了断言。
+

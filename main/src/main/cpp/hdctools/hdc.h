@@ -18,7 +18,14 @@
 extern "C" {
 #endif
 
-int cmd(int argc, const char *argv[], const char *tempPath);
+/**
+ * Run one hdc client command.
+ * Output paths are passed explicitly instead of via process-wide environment
+ * variables: `cmd()` mutates process-level state (stdout/stderr redirection,
+ * temp dir, argv) and must never be invoked concurrently.
+ */
+int cmd(int argc, const char *argv[], const char *tempPath,
+    const char *outPath, const char *errPath);
 int server(const char *tempPath);
 
 #ifdef __cplusplus

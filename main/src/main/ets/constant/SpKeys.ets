@@ -5,6 +5,10 @@ export class SpKeys {
   public static readonly FLOAT_CLOCK_ON: string = 'float_clock_on';
   public static readonly CPU_STRESS_ON: string = 'cpu_stress_on';
   public static readonly WEB_SERVER_ON: string = 'web_server_on';
+  /** Web 服务单次上传/下载上限（MB），默认 200MB。 */
+  public static readonly WEB_SERVER_MAX_TRANSFER_MB: string = 'web_server_max_transfer_mb';
+  /** Web 服务随机访问令牌，用于局域网访问鉴权。 */
+  public static readonly WEB_SERVER_TOKEN: string = 'web_server_token';
   public static readonly AUTO_START_ENABLED: string = 'auto_start_enabled';
   public static readonly TOOL_ORDER: string = 'tool_order';
   public static readonly HDC_DEBUG_LOG: string = 'hdc_debug_log';

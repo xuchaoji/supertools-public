@@ -31,13 +31,13 @@
         "name": "release",
         "type": "HarmonyOS",
         "material": {
-          "storeFile": "D:/dev/devEcoWkSpace/supertools-public/sign/supertools.p12",
+          "storeFile": "./sign/supertools.p12",
           "storePassword": "00000019DD72FB26037C821BAC415776A961DD8E1C07B5E35BC9030369823C2D544BAF9246C8D79368",
           "keyAlias": "supertools",
           "keyPassword": "000000190262FC8BC1D38F8A0B5D2CE15CDCCB5B2C6CFDDA390264C345D7678FDB28E6A05233A7113B",
           "signAlg": "SHA256withECDSA",
-          "profile": "D:/dev/devEcoWkSpace/supertools-public/sign/supertoolsRelease.p7b",
-          "certpath": "D:/dev/devEcoWkSpace/supertools-public/sign/supertools.cer"
+          "profile": "./sign/supertoolsRelease.p7b",
+          "certpath": "./sign/supertools.cer"
         }
       }
     ],

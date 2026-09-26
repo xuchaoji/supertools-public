@@ -47,6 +47,7 @@ class WebViewModel {
   @Trace isServerRunning: boolean = false;
   @Trace serverIp: string = "0.0.0.0";
   @Trace serverPort: number = 8088;
+  @Trace maxTransferMb: number = 200;
   @Trace bundleName: string = "";
   @Trace fileList: FileItem[] = [];
   @Trace currentPath: string = "";
@@ -101,6 +102,8 @@ export struct LocalWebPage {
     }
 
     let server = WebServerUtil.getInstance();
+    this.viewModel.maxTransferMb = PreferencesUtil.getNumberSync(SpKeys.WEB_SERVER_MAX_TRANSFER_MB, 200);
+    server.setMaxTransferMb(this.viewModel.maxTransferMb);
     server.init(this.viewModel.rootDir, this.viewModel.serverPort);
     if (server.isRunning) {
       this.viewModel.isServerRunning = true;
@@ -374,6 +377,27 @@ export struct LocalWebPage {
     this.refreshFileList();
   }
 
+  showTransferLimitMenu(): void {
+    const limits: number[] = [50, 100, 200, 500, 1024];
+    promptAction.showActionMenu({
+      title: `单次上传/下载上限（当前 ${this.viewModel.maxTransferMb} MB）`,
+      buttons: [
+        { text: '50 MB', color: '#007DFF' },
+        { text: '100 MB', color: '#007DFF' },
+        { text: '200 MB', color: '#007DFF' },
+        { text: '500 MB', color: '#007DFF' },
+        { text: '1024 MB', color: '#007DFF' }
+      ]
+    }).then(data => {
+      if (data.index < 0 || data.index >= limits.length) return;
+      const value: number = limits[data.index];
+      this.viewModel.maxTransferMb = value;
+      WebServerUtil.getInstance().setMaxTransferMb(value);
+      PreferencesUtil.put(SpKeys.WEB_SERVER_MAX_TRANSFER_MB, value);
+      promptAction.showToast({ message: `单次传输上限已设为 ${value} MB` });
+    }).catch(() => {});
+  }
+
   showHdcGuide(): void {
     let remotePath = `${this.viewModel.phyDirPath}\/`;
     if (this.viewModel.currentPath !== "") {
@@ -434,7 +458,8 @@ export struct LocalWebPage {
       relative = relative.substring(1);
     }
     let path = relative ? `${relative}/${item.name}` : item.name;
-    this.viewModel.previewUrl = `http://127.0.0.1:${this.viewModel.serverPort}/${path}`;
+    const token: string = encodeURIComponent(WebServerUtil.getInstance().token);
+    this.viewModel.previewUrl = `http://127.0.0.1:${this.viewModel.serverPort}/${path}?token=${token}`;
     this.viewModel.isPreviewing = true;
   }
 
@@ -556,10 +581,23 @@ export struct LocalWebPage {
           }
 
           if (this.viewModel.isServerRunning) {
-            Text(`http://${this.viewModel.serverIp}:${this.viewModel.serverPort}`)
+            Text(WebServerUtil.getInstance().getAccessUrl())
               .fontSize(14)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
               .fontColor($r('sys.color.ohos_id_color_text_secondary'))
               .margin({ top: 4 })
+              .onClick(() => {
+                let data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN,
+                  WebServerUtil.getInstance().getAccessUrl());
+                pasteboard.getSystemPasteboard().setData(data);
+                promptAction.showToast({ message: '带访问令牌的地址已复制' });
+              })
+            Text(`单次传输上限 ${this.viewModel.maxTransferMb} MB（点击设置）`)
+              .fontSize(12)
+              .fontColor($r('sys.color.ohos_id_color_text_secondary'))
+              .margin({ top: 4 })
+              .onClick(() => this.showTransferLimitMenu())
           }
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
 

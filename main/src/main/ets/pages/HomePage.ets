@@ -177,11 +177,13 @@ export struct HomePage {
   private wallpaperLayerY: number = 0;
 
   aboutToAppear(): void {
-    if (TargetConstants.IS_AG_TARGET) {
-      this.isHdcVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_HDC_VISIBLE, false);
-    } else {
-      this.isHdcVisible = true;
-    }
+    // HDC 调试入口可见性：
+    //   dev  —— 默认可见
+    //   AG   —— 默认隐藏，需「设置页连点彩蛋」写入 ENABLE_HDC_VISIBLE 后出现
+    // HDC_DEBUG_ENABLED 只作为显式总闸（默认 true），不参与 AG 的隐藏规则。
+    this.isHdcVisible = TargetConstants.HDC_DEBUG_ENABLED &&
+      (!TargetConstants.IS_AG_TARGET ||
+        PreferencesUtil.getBooleanSync(SpKeys.ENABLE_HDC_VISIBLE, false));
     // 设备信息：default / dev 两个 target 均默认可见
     this.listData.push({
       name: '设备信息',

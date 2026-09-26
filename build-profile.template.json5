@@ -1,0 +1,136 @@
+{
+  // 本文件是 build-profile.json5 的模板。真正的 build-profile.json5 已被 .gitignore 忽略，
+  // 因为它包含仅属于本机的签名绝对路径与（机器绑定的加密）口令，不应提交。
+  //
+  // 使用方式：
+  //   1. 用 DevEco Studio 打开工程并在「Project Structure > Signing Configs」里勾选自动签名，
+  //      DevEco 会自动生成本地的 build-profile.json5；或
+  //   2. 复制本文件为 build-profile.json5，再把下面 <> 占位符替换为本机实际路径与口令。
+  //
+  // 备注：
+  //   - 签名口令是 DevEco 生成的机器绑定加密串，换机器必须重新签名，不能直接拷贝。
+  //   - 仓库内 sign/ 目录同样被忽略；它保存 release 签名材料与本机解密缓存（sign/material）。
+  //   - build-profile-pad-release.json5 之类按设备形态区分的 profile 也是本机文件，不提交。
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "<HOME>/.ohos/config/default_<project>.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "<DevEco 生成的加密口令>",
+          "profile": "<HOME>/.ohos/config/default_<project>.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "<HOME>/.ohos/config/default_<project>.p12",
+          "storePassword": "<DevEco 生成的加密口令>"
+        }
+      },
+      {
+        "name": "dev",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "<HOME>/.ohos/config/dev_<project>.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "<DevEco 生成的加密口令>",
+          "profile": "<HOME>/.ohos/config/dev_<project>.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "<HOME>/.ohos/config/dev_<project>.p12",
+          "storePassword": "<DevEco 生成的加密口令>"
+        }
+      },
+      {
+        "name": "release",
+        "type": "HarmonyOS",
+        "material": {
+          // release 材料放在仓库内被忽略的 sign/ 目录，使用工程相对路径即可
+          "storeFile": "./sign/supertools.p12",
+          "storePassword": "<DevEco 生成的加密口令>",
+          "keyAlias": "supertools",
+          "keyPassword": "<DevEco 生成的加密口令>",
+          "signAlg": "SHA256withECDSA",
+          "profile": "./sign/supertoolsRelease.p7b",
+          "certpath": "./sign/supertools.cer"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "default",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools",
+        "label": "$string:app_name",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "dev",
+        "signingConfig": "dev",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools.dev",
+        "label": "$string:app_name_dev",
+        "icon": "$media:layered_icon_dev",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "release",
+        "signingConfig": "release",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools",
+        "label": "$string:app_name",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "main",
+      "srcPath": "./main",
+      // 模块 target 名必须与 main/build-profile.json5 的 targets 一致：product / dev
+      "targets": [
+        {
+          "name": "product",
+          "applyToProducts": [
+            "default",
+            "release"
+          ]
+        },
+        {
+          "name": "dev",
+          "applyToProducts": [
+            "dev"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -5,6 +5,8 @@
   "main": "",
   "author": "",
   "license": "",
-  "dependencies": {}
+  "dependencies": {
+    "libhdc_z.so": "file:./src/main/cpp/types/libhdc_z"
+  }
 }
 

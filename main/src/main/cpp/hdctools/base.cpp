@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright (C) 2021 Huawei Device Co., Ltd.
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -710,11 +710,10 @@ static void EchoLog(string &buf)
         if (buf[0]) {
             printf("%s\n", buf);
         }
-        string outPath = g_tempDir + "hdc.out";
-        LogToPath(outPath.c_str(), buf);
-        if (buf[0]) {
-            LogToPath(outPath.c_str(), "\n");
-        }
+        // 这里原本还会 LogToPath(g_tempDir + "hdc.out")，而该文件是进程级共享、
+        // 只追加不清理，ArkTS 侧只读取每条命令自己的 run_<seq>/hdc.out，从不读它，
+        // 因此它只会跨命令交错并无上限增长。stdout 已由 cmd() dup2 到本次命令的
+        // 输出文件，保留这条写入属于重复且有害，故移除。
     }
 
     void PrintMessageAndWriteLog(const char *fmt, ...)
