@@ -23,4 +23,6 @@ export class SpKeys {
   public static readonly APP_LINKING_HISTORY: string = 'app_linking_history';
   /** App Linking 拉起方式：true=openLink（App Linking/深链官方入口），false=startAbility(viewData) */
   public static readonly APP_LINK_LAUNCH_MODE: string = 'app_link_launch_mode';
+  /** HDC 调试页终端输出字号（number，9~24，默认 13） */
+  public static readonly HDC_TERM_FONT_SIZE: string = 'hdc_term_font_size';
 }

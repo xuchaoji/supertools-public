@@ -45,6 +45,10 @@ const HISTORY_KEY: string = 'hdc_history';
 const MAX_HISTORY: number = 20;
 /** 抓取日志的保存目录（应用沙箱内） */
 const LOG_DIR: string = '/data/storage/el2/base/hdcz/logs/';
+/** 终端输出字号范围与默认值（vp）：双指缩放 / A−A+ 都收敛到这个区间 */
+const TERM_FONT_MIN: number = 9;
+const TERM_FONT_MAX: number = 24;
+const TERM_FONT_DEFAULT: number = 13;
 
 @HMRouter({ pageUrl: "hdcDebugPage" })
 @Entry
@@ -66,6 +70,11 @@ export struct HdcDebugPage {
   @Local capturing: boolean = false;
   @Local logFiles: LogFileInfo[] = [];
   @Local showLogManager: boolean = false;
+  /** 终端输出字号（vp）：可双指缩放或点 A−/A+ 调，持久化到 SpKeys.HDC_TERM_FONT_SIZE */
+  @Local termFontSize: number = TERM_FONT_DEFAULT;
+  private pinchStartDist: number = 0;
+  private pinchBaseFont: number = TERM_FONT_DEFAULT;
+  private pinchZooming: boolean = false;
   private lastCaptureEnd: number = 0;
   private scroller: Scroller = new Scroller();
   /** 全局单例：所有页面共用同一命令队列，避免 native 进程级状态串线。 */
@@ -137,6 +146,8 @@ export struct HdcDebugPage {
   aboutToAppear(): void {
     this.safeBottom = SafeArea.bottom();
     hilog.info(0x0000, "HDC_Z", "HdcDebugPage aboutToAppear");
+    this.termFontSize = this.clampTermFont(
+      PreferencesUtil.getNumberSync(SpKeys.HDC_TERM_FONT_SIZE, TERM_FONT_DEFAULT));
     this.initThemeListener();
     this.addSystem("=== SuperTools HDC ===");
     this.addSystem("Starting HDC server...");
@@ -165,6 +176,83 @@ export struct HdcDebugPage {
     this.themeMq?.off('change');
     this.themeMq = null;
     this.hdcService.destroy();
+  }
+
+  // ===================== 终端输出缩放 =====================
+  // 双指缩放 / A−A+ 改输出字号，9~24vp，持久化到 SpKeys.HDC_TERM_FONT_SIZE。
+  //
+  // 为什么手写 TouchEvent 而不用 PinchGesture：本环境 PanGesture/PinchGesture 识别器
+  // 不可靠（HomePage 裁切浮层的缩放也是因此改成手写，见 HomePage.handleCropTouch 注释），
+  // 所以这里同样直接消费触摸流：**只处理双指**，单指事件完全不干预，列表照常滚动。
+
+  /** 字号夹取：非法值回落默认，并限制在 [TERM_FONT_MIN, TERM_FONT_MAX] */
+  private clampTermFont(size: number): number {
+    if (isNaN(size) || size <= 0) {
+      return TERM_FONT_DEFAULT;
+    }
+    return Math.min(TERM_FONT_MAX, Math.max(TERM_FONT_MIN, Math.round(size)));
+  }
+
+  /** 应用字号（不落盘）；跟随模式下重新滚到底部 */
+  private applyTermFont(size: number): void {
+    const next = this.clampTermFont(size);
+    if (next === this.termFontSize) {
+      return;
+    }
+    this.termFontSize = next;
+    if (this.followOutput) {
+      setTimeout(() => { this.scroller.scrollEdge(Edge.Bottom); }, 30);
+    }
+  }
+
+  private persistTermFont(): void {
+    try {
+      PreferencesUtil.putSync(SpKeys.HDC_TERM_FONT_SIZE, this.termFontSize);
+    } catch (e) {
+      hilog.error(0x0000, "HDC_Z", "save term font failed: %{public}s", JSON.stringify(e));
+    }
+  }
+
+  /** A− / A+ 步进（立即落盘） */
+  private stepTermFont(delta: number): void {
+    this.applyTermFont(this.termFontSize + delta);
+    this.persistTermFont();
+  }
+
+  /** 点中间的字号数字：恢复默认 */
+  private resetTermFont(): void {
+    this.applyTermFont(TERM_FONT_DEFAULT);
+    this.persistTermFont();
+  }
+
+  /** 两指间距（vp），用于双指缩放比例 */
+  private fingerDist(a: TouchObject, b: TouchObject): number {
+    const dx = a.windowX - b.windowX;
+    const dy = a.windowY - b.windowY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /** 终端区触摸：Down 记基准 → Move 实时缩放 → Up/Cancel 落盘；单指一律放行 */
+  private handleTerminalTouch(event: TouchEvent): void {
+    const touches = event.touches;
+    if (event.type === TouchType.Down) {
+      if (touches.length >= 2) {
+        this.pinchZooming = true;
+        this.pinchStartDist = this.fingerDist(touches[0], touches[1]);
+        this.pinchBaseFont = this.termFontSize;
+      }
+    } else if (event.type === TouchType.Move) {
+      if (this.pinchZooming && touches.length >= 2 && this.pinchStartDist > 0) {
+        const dist = this.fingerDist(touches[0], touches[1]);
+        this.applyTermFont(this.pinchBaseFont * dist / this.pinchStartDist);
+      }
+    } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+      if (this.pinchZooming) {
+        this.pinchZooming = false;
+        this.pinchStartDist = 0;
+        this.persistTermFont();
+      }
+    }
   }
 
   /** 订阅系统深/浅色模式变化，驱动文字阴影参数切换 */
@@ -624,6 +712,27 @@ export struct HdcDebugPage {
           .textShadow(ImmersiveStyles.textShadow(this.isDark))
         Text(this.entries.length + " 行").fontSize(10).fontColor("sys.color.font_secondary")
           .textShadow(ImmersiveStyles.textShadow(this.isDark))
+
+        // 输出缩放：A− 缩小 / 点数字恢复默认 / A+ 放大（终端区双指捏合同效）
+        Row({ space: 2 }) {
+          Text("A−")
+            .fontSize(11).fontColor("sys.color.font_secondary")
+            .textShadow(ImmersiveStyles.textShadow(this.isDark))
+            .padding({ left: 7, right: 7, top: 3, bottom: 3 })
+            .onClick(() => { this.stepTermFont(-1); })
+          Text(this.termFontSize.toString())
+            .fontSize(10).fontFamily("monospace").fontColor("#007AFF")
+            .textShadow(ImmersiveStyles.textShadow(this.isDark))
+            .padding({ left: 4, right: 4, top: 3, bottom: 3 })
+            .onClick(() => { this.resetTermFont(); })
+          Text("A+")
+            .fontSize(11).fontColor("sys.color.font_secondary")
+            .textShadow(ImmersiveStyles.textShadow(this.isDark))
+            .padding({ left: 7, right: 7, top: 3, bottom: 3 })
+            .onClick(() => { this.stepTermFont(1); })
+        }
+        .backgroundColor("sys.color.comp_background_gray").borderRadius(4)
+
         Blank()
         Text(this.followOutput ? "⤓ 跟随" : "⤒ 暂停")
           .fontSize(11).fontColor(this.followOutput ? "#007AFF" : "sys.color.font_secondary")
@@ -639,7 +748,7 @@ export struct HdcDebugPage {
       List({ scroller: this.scroller }) {
         ForEach(this.entries, (e: TerminalEntry) => {
           ListItem() {
-            Text(e.text).fontSize(13).fontFamily("monospace").fontColor(this.entryColor(e.type))
+            Text(e.text).fontSize(this.termFontSize).fontFamily("monospace").fontColor(this.entryColor(e.type))
               .textShadow(ImmersiveStyles.textShadow(this.isDark))
               .copyOption(CopyOptions.LocalDevice)
               .width("100%").padding({ top: 2, bottom: 2, left: 12, right: 12 })
@@ -650,7 +759,7 @@ export struct HdcDebugPage {
           ListItem() {
             Row() {
               LoadingProgress().width(12).height(12).margin({ right: 6 })
-              Text("running...").fontSize(12).fontColor("sys.color.font_secondary").fontFamily("monospace")
+              Text("running...").fontSize(Math.max(10, this.termFontSize - 1)).fontColor("sys.color.font_secondary").fontFamily("monospace")
                 .textShadow(ImmersiveStyles.textShadow(this.isDark))
             }.padding({ left: 12, right: 12, top: 4, bottom: 4 })
           }
@@ -967,6 +1076,10 @@ export struct HdcDebugPage {
             .layoutWeight(1).width("100%").padding({ left: 12, right: 12 })
             .backgroundColor("sys.color.background_primary").borderRadius(12)
             .border({ width: 1, color: "sys.color.comp_background_emphasize" })
+            // 终端区双指捏合 = 缩放输出字号（手写 TouchEvent：只吃双指，单指放行给列表滚动）
+            .onTouch((event: TouchEvent) => {
+              this.handleTerminalTouch(event);
+            })
 
           Column() {
             this.connectBar()

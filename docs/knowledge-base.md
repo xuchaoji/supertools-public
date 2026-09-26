@@ -994,6 +994,21 @@ struct StressCapsule {
 
 `libhdc_z.so`（`main/src/main/cpp/hdctools/`，基于裁剪的 hdctools_src）的 ArkTS 封装。
 
+**终端输出缩放（`pages/HdcDebugPage.ets`）**：输出字号可调，9~24vp，默认 13，持久化于
+`SpKeys.HDC_TERM_FONT_SIZE`。
+
+| 交互 | 实现 |
+|---|---|
+| 双指捏合 | 终端区 `onTouch` 手写：`Down` 记基准、`Move` 按两指距离比例缩放、`Up/Cancel` 落盘 |
+| `A−` / `A+` | 终端标题栏内，步进 1vp 并立即落盘 |
+| 点中间数字 | 恢复默认 13 |
+
+> 为什么手写而不用 `PinchGesture`：本环境 `PanGesture/PinchGesture` 识别器不可靠
+> （HomePage 裁切浮层的缩放也是因此改手写，见 `HomePage.handleCropTouch` 注释）。
+> 手写版**只处理双指**（`touches.length >= 2`），单指事件不消费，终端列表滚动不受影响。
+> 注意 `uitest uiInput` 没有多指注入能力，双指路径无法自动化验证，改动后需真机手测；
+> `A−/A+` 与持久化可以脚本验证（用 dump 里输出行的**高度**随字号变化来断言）。
+
 ```typescript
 import { HdcService, HDC_BUSY_EXIT_CODE } from '../utils/HdcService';
 
@@ -1599,8 +1614,14 @@ export class SpKeys {
   public static readonly CPU_STRESS_ON: string = 'cpu_stress_on';
   public static readonly WEB_SERVER_ON: string = 'web_server_on';
   public static readonly AUTO_START_ENABLED: string = 'auto_start_enabled';
+  // …其余见 constant/SpKeys.ets（壁纸/光感/工具顺序/各类历史均在此声明）
 }
 ```
+
+> 新增持久化键一律加在 `constant/SpKeys.ets`，不要在页面里写字符串字面量。
+> 现有键：隐私同意、扫码入口、HDC 入口、悬浮时钟/压测、Web 服务与其传输上限、自启动总开关、
+> 工具卡顺序、HDC 抓取日志开关、**HDC 终端字号 `hdc_term_font_size`**、壁纸路径与模糊度、
+> 光感档位、二维码/H5/App Linking 历史、App Linking 拉起方式。
 
 ## 14. 自动化测试
 
