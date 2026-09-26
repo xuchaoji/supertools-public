@@ -177,6 +177,32 @@ export class ImmersiveStyles {
       : { radius: 3, color: 'rgba(255, 255, 255, 0.85)', offsetX: 0, offsetY: 1 };
   }
 
+  // ===================== 输入框（TextArea / TextInput） =====================
+
+  /**
+   * 输入框底色：**半透明**，让卡片/壁纸透上来。
+   * 禁止再用不透明的 `sys.color.comp_background_gray` / `sys.color.background_primary`
+   * ——那样输入框会变成一块纯色贴片，与沉浸光感背景割裂（AppLinkingTool 踩过）。
+   */
+  static inputBg(): string {
+    return 'rgba(128, 128, 128, 0.12)';
+  }
+
+  /** 输入框背景高斯模糊半径（vp）：与按钮同款"背景模糊后透上来"；全局光感=关闭时不模糊 */
+  static inputBlur(): number {
+    return LightSense.getLevel() <= LightSense.LEVEL_OFF ? 0 : 8;
+  }
+
+  /** 输入框描边：跟随光感的 rim 亮边（上/左亮、下/右暗） */
+  static inputRim(isDark: boolean): EdgeColors {
+    return ImmersiveStyles.cardOuterRim(isDark);
+  }
+
+  /** 输入框圆角（vp） */
+  static inputRadius(): number {
+    return 8;
+  }
+
   // ===================== 底部 Tab 栏 =====================
 
   /** Tab 栏毛玻璃基底色：可读性优先，透明度比卡片更高（悬浮胶囊改用系统模糊材质 backgroundBlurStyle，此处保留备用） */

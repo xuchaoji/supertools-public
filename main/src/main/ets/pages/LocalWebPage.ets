@@ -12,6 +12,9 @@ import { BackgroundServiceManager } from '../utils/BackgroundServiceManager';
 import { TargetConstants } from 'main/ets/TargetConstants';
 import { AppUtil, PreferencesUtil } from '@pura/harmony-utils';
 import { WallpaperHost } from '../components/WallpaperHost';
+import { PageHeader } from '../components/PageHeader';
+import { GlassCard } from '../components/GlassCard';
+import { GlassButton } from '../components/GlassButton';
 import { mediaquery } from '@kit.ArkUI';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 import { LightSense } from '../utils/LightSense';
@@ -536,23 +539,43 @@ export struct LocalWebPage {
         .onChange((val) => {
           this.dialogInputName = val;
         })
+        .backgroundColor(ImmersiveStyles.inputBg())
+        .backdropBlur(ImmersiveStyles.inputBlur())
+        .borderRadius(ImmersiveStyles.inputRadius())
+        .border({ width: 1, color: ImmersiveStyles.inputRim(this.isDark) })
         .width('100%').margin({ bottom: 20 })
       Row() {
-        Button("取消")
-          .backgroundColor('#F5F5F5')
-          .fontColor('#666')
-          .onClick(() => {
+        GlassButton({
+          label: "取消",
+          fillWidth: true,
+          bgColor: '#F5F5F5',
+          textColor: '#666',
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 40,
+          padX: 16,
+          onAction: () => {
             this.newFolderDialogController?.close();
             this.renameDialogController?.close();
-          })
+          }
+        })
           .layoutWeight(1)
           .margin({ right: 10 })
-        Button("确定").backgroundColor('#007DFF')
-          .onClick(() => {
+        GlassButton({
+          label: "确定",
+          fillWidth: true,
+          bgColor: '#007DFF',
+          textColor: Color.White,
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 40,
+          padX: 16,
+          onAction: () => {
             onConfirm();
             this.newFolderDialogController?.close();
             this.renameDialogController?.close();
-          })
+          }
+        })
           .layoutWeight(1)
       }.width('100%')
     }.padding(20).backgroundColor($r('sys.color.ohos_id_color_background'))
@@ -561,22 +584,28 @@ export struct LocalWebPage {
   @Builder
   HeaderSection() {
     Column() {
-      Row() {
+      GlassCard() {
+        Row() {
         Column() {
           Row() {
             Text(this.viewModel.isServerRunning ? "服务运行中" : "服务已停止")
               .fontWeight(FontWeight.Bold)
               .fontColor(this.viewModel.isServerRunning ? $r('sys.color.ohos_id_color_connected') :
                 $r('sys.color.ohos_id_color_warning'))
-            Button("?")
+            GlassButton({
+              label: "?",
+              fillWidth: true,
+              bgColor: $r('sys.color.ohos_id_color_tertiary'),
+              textColor: $r('sys.color.ohos_id_color_text_primary'),
+              strokeWidth: 0,
+              blurRadius: 0,
+              btnHeight: 20,
+              radius: 10,
+              fontSize: 12,
+              onAction: () => { this.showHdcGuide(); }
+            })
               .width(20)
-              .height(20)
-              .padding(0)
-              .fontSize(12)
               .margin({ left: 8 })
-              .backgroundColor($r('sys.color.ohos_id_color_tertiary'))
-              .fontColor($r('sys.color.ohos_id_color_text_primary'))
-              .onClick(() => this.showHdcGuide())
           }
 
           if (this.viewModel.isServerRunning) {
@@ -604,15 +633,9 @@ export struct LocalWebPage {
       }
       // 光感状态卡片：通透玻璃 + 边缘折射（非磨砂），壁纸透出
       .padding(16)
-      .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle())
-      .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
-      .linearGradient({ angle: 135, colors: ImmersiveStyles.cardSurfaceColors(this.isDark) })
-      .border({ width: ImmersiveStyles.cardRimWidth(), color: ImmersiveStyles.cardOuterRim(this.isDark) })
-      .borderRadius(12)
-      .clip(true)
-      .visualEffect(LightSense.lightVisualEffect())
-      .margin(16)
+      }
     }
+    .margin(16)
   }
 
   @Builder
@@ -641,13 +664,33 @@ export struct LocalWebPage {
       })
 
       Row() {
-        Button("导入").fontSize(13).height(32).margin({ right: 10 }).onClick(() => this.importFiles())
-        Button("建文件夹").fontSize(13).height(32).margin({ right: 10 }).onClick(() => {
-          this.dialogInputName = "";
-          this.newFolderDialogController?.open();
+        GlassButton({
+          label: "导入",
+          btnHeight: 32,
+          fontSize: 13,
+          padX: 14,
+          onAction: () => { this.importFiles(); }
         })
+          .margin({ right: 10 })
+        GlassButton({
+          label: "建文件夹",
+          btnHeight: 32,
+          fontSize: 13,
+          padX: 14,
+          onAction: () => {
+            this.dialogInputName = "";
+            this.newFolderDialogController?.open();
+          }
+        })
+          .margin({ right: 10 })
         Blank()
-        Button("刷新").fontSize(13).height(32).onClick(() => this.refreshFileList())
+        GlassButton({
+          label: "刷新",
+          btnHeight: 32,
+          fontSize: 13,
+          padX: 14,
+          onAction: () => { this.refreshFileList(); }
+        })
       }.width('100%').padding({ left: 16, right: 16, bottom: 12 })
     }
   }
@@ -688,13 +731,18 @@ export struct LocalWebPage {
               item.isDir ? this.enterFolder(item) : this.openPreview(item)
             })
 
-            Button("⚙️")
-              .type(ButtonType.Normal)
-              .fontSize(22)
-              .backgroundColor(Color.Transparent)
-              .padding(0)
+            GlassButton({
+              label: "⚙️",
+              fillWidth: true,
+              bgColor: Color.Transparent,
+              strokeWidth: 0,
+              blurRadius: 0,
+              btnHeight: 40,
+              fontSize: 22,
+              onAction: () => {
+              }
+            })
               .width(40)
-              .height(40)
               .bindMenu(this.getMenuItems(item))
           }
           // 光感文件行：通透玻璃 + 边缘折射（非磨砂），壁纸透出
@@ -724,19 +772,32 @@ export struct LocalWebPage {
   EditorLayer() {
     Column() {
       Row() {
-        Button("取消")
-          .fontColor($r('sys.color.ohos_id_color_text_secondary'))
-          .backgroundColor(Color.Transparent)
-          .onClick(() => {
+        GlassButton({
+          label: "取消",
+          bgColor: Color.Transparent,
+          textColor: $r('sys.color.ohos_id_color_text_secondary'),
+          strokeWidth: 0,
+          blurRadius: 0,
+          padX: 16,
+          onAction: () => {
             this.viewModel.isEditing = false;
-          })
+          }
+        })
         Text(`编辑: ${this.viewModel.editingFileName}`)
           .fontWeight(FontWeight.Bold)
           .layoutWeight(1)
           .textAlign(TextAlign.Center)
           .fontColor($r('sys.color.ohos_id_color_text_primary'))
-        Button("保存").fontColor('#007DFF').backgroundColor(Color.Transparent).onClick(() => {
-          this.saveFile();
+        GlassButton({
+          label: "保存",
+          bgColor: Color.Transparent,
+          textColor: '#007DFF',
+          strokeWidth: 0,
+          blurRadius: 0,
+          padX: 16,
+          onAction: () => {
+            this.saveFile();
+          }
         })
       }.height(56).width('100%').border({ width: { bottom: 1 }, color: $r('sys.color.ohos_id_color_list_separator') })
 
@@ -748,6 +809,10 @@ export struct LocalWebPage {
         .width('100%')
         .fontFamily('Monospace')
         .fontSize(14)
+        .backgroundColor(ImmersiveStyles.inputBg())
+        .backdropBlur(ImmersiveStyles.inputBlur())
+        .borderRadius(ImmersiveStyles.inputRadius())
+        .border({ width: 1, color: ImmersiveStyles.inputRim(this.isDark) })
         .padding(12)
         .backgroundColor($r('sys.color.ohos_id_color_background'))
         .fontColor($r('sys.color.ohos_id_color_text_primary'))
@@ -763,9 +828,17 @@ export struct LocalWebPage {
           .margin({ left: 16 })
           .fontColor($r('sys.color.ohos_id_color_text_primary'))
         Blank()
-        Button("关闭").onClick(() => {
-          this.viewModel.isPreviewing = false;
-        }).backgroundColor(Color.Transparent).fontColor($r('sys.color.ohos_id_color_text_primary'))
+        GlassButton({
+          label: "关闭",
+          bgColor: Color.Transparent,
+          textColor: $r('sys.color.ohos_id_color_text_primary'),
+          strokeWidth: 0,
+          blurRadius: 0,
+          padX: 16,
+          onAction: () => {
+            this.viewModel.isPreviewing = false;
+          }
+        })
       }.height(50).width('100%').border({ width: { bottom: 1 }, color: $r('sys.color.ohos_id_color_list_separator') })
 
       Web({ src: this.viewModel.previewUrl, controller: this.viewModel.webController }).layoutWeight(1).width('100%')
@@ -778,6 +851,10 @@ export struct LocalWebPage {
       WallpaperHost() {
         Stack() {
           Column() {
+            // ---------- 标题栏 ----------
+            PageHeader({ title: '本地 Web 服务', subtitle: '局域网静态文件服务与网页上传' })
+              .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
             this.HeaderSection()
             Divider().color($r('sys.color.ohos_id_color_list_separator'))
             this.OperationSection()
@@ -791,19 +868,31 @@ export struct LocalWebPage {
                 .layoutWeight(1)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
-              Button("取消")
-                .fontSize(12)
-                .height(24)
-                .backgroundColor('#FFFFFF')
-                .fontColor('#007DFF')
+              GlassButton({
+                label: "取消",
+                bgColor: '#FFFFFF',
+                textColor: '#007DFF',
+                strokeWidth: 0,
+                blurRadius: 0,
+                btnHeight: 24,
+                radius: 12,
+                fontSize: 12,
+                padX: 10,
+                onAction: () => { this.viewModel.clipboard = null; }
+              })
                 .margin({ right: 8 })
-                .onClick(() => this.viewModel.clipboard = null)
-              Button("粘贴到此处")
-                .fontSize(12)
-                .height(24)
-                .backgroundColor('#FFFFFF')
-                .fontColor('#007DFF')
-                .onClick(() => this.execPaste())
+              GlassButton({
+                label: "粘贴到此处",
+                bgColor: '#FFFFFF',
+                textColor: '#007DFF',
+                strokeWidth: 0,
+                blurRadius: 0,
+                btnHeight: 24,
+                radius: 12,
+                fontSize: 12,
+                padX: 10,
+                onAction: () => { this.execPaste(); }
+              })
             }
             .width('100%')
             .padding({

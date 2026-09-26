@@ -21,6 +21,7 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 import { HdsTabs, HdsTabsController, HdsTabsFloatingStyle, hdsMaterial } from '@kit.UIDesignKit';
 import { SettingGroup } from "../components/SettingGroup";
 import { SettingSwitchItem } from "../components/SettingSwitchItem";
+import { GlassButton } from "../components/GlassButton";
 import { CommonViewModel } from "../viewmodel/CommonViewModel"
 import { GlobalContextHolder } from "../utils/GlobalContextHolder";
 import { FloatClockManager } from "../capabilities/floatingclock/FloatClockManager";
@@ -1020,15 +1021,21 @@ export struct HomePage {
                   .blur(WallpaperUtil.blurRadius(this.wallpaperBlur))
                   .margin({ right: '8vp' })
 
-                Button('恢复默认')
-                  .height(32)
-                  .fontSize(12)
-                  .onClick(() => this.removeWallpaper())
+                GlassButton({
+                  label: '恢复默认',
+                  btnHeight: 32,
+                  fontSize: 12,
+                  padX: 16,
+                  onAction: () => { this.removeWallpaper(); }
+                })
               } else {
-                Button('选择图片')
-                  .height(32)
-                  .fontSize(12)
-                  .onClick(() => this.pickWallpaper())
+                GlassButton({
+                  label: '选择图片',
+                  btnHeight: 32,
+                  fontSize: 12,
+                  padX: 16,
+                  onAction: () => { this.pickWallpaper(); }
+                })
               }
             }
             .width('100%')
@@ -1162,22 +1169,32 @@ export struct HomePage {
       // 既挡在用户捏合/拖拽的必经之路上（拦截手势），视觉上也是悬浮在中间。
       // position({x:0,y:0}) 固定到浮层左上角，恢复“顶部操作条”的本意。
       Row() {
-        Button('取消')
-          .height(36)
-          .fontSize(14)
-          .backgroundColor('rgba(255, 255, 255, 0.18)')
-          .fontColor(Color.White)
-          .onClick(() => this.closeCrop())
+        GlassButton({
+          label: '取消',
+          bgColor: 'rgba(255, 255, 255, 0.18)',
+          textColor: Color.White,
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 36,
+          fontSize: 14,
+          padX: 16,
+          onAction: () => { this.closeCrop(); }
+        })
 
         Blank()
 
-        Button('确定')
-          .height(36)
-          .fontSize(14)
-          .backgroundColor('rgba(255, 255, 255, 0.92)')
-          .fontColor(Color.Black)
-          .enabled(this.cropReady)
-          .onClick(() => this.confirmCrop())
+        GlassButton({
+          label: '确定',
+          bgColor: 'rgba(255, 255, 255, 0.92)',
+          textColor: Color.Black,
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 36,
+          fontSize: 14,
+          padX: 16,
+          isEnabled: this.cropReady,
+          onAction: () => { this.confirmCrop(); }
+        })
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: 12, bottom: 12 })

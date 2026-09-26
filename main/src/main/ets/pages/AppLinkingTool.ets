@@ -9,26 +9,43 @@ import { PreferencesUtil } from '@pura/harmony-utils';
 import { SpKeys } from '../constant/SpKeys';
 import { LinkHistoryUtil, LinkHistoryItem } from '../utils/UrlHistoryUtil';
 import { WallpaperHost } from '../components/WallpaperHost';
+import { PageHeader } from '../components/PageHeader';
+import { GlassCard } from '../components/GlassCard';
+import { GlassButton } from '../components/GlassButton';
 import { SafeArea } from '../utils/SafeArea';
 import { ScanQrOverlay } from '../components/ScanQrOverlay';
+import { mediaquery } from '@kit.ArkUI';
+import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 
 const TAG: string = 'AppLinkingTool';
 
 @HMRouter({ pageUrl: 'appLinkingTool' })
-@Component
+@ComponentV2
 export struct AppLinkingTool {
-  @State inputUrl: string = '';
-  @State parsedResult: ParsedURLResult = URLParserUtil.parse('');
-  @State isScanning: boolean = false;
-  @State isScanVisible: boolean = false;
+  @Local inputUrl: string = '';
+  @Local parsedResult: ParsedURLResult = URLParserUtil.parse('');
+  @Local isScanning: boolean = false;
+  @Local isScanVisible: boolean = false;
   /** 解析/拉起历史（最新在前，持久化于 SpKeys.APP_LINKING_HISTORY） */
-  @State historyList: LinkHistoryItem[] = [];
+  @Local historyList: LinkHistoryItem[] = [];
   /** 拉起方式：true=openLink（App Linking/深链官方入口）；false=startAbility(viewData 传统拉起） */
-  @State launchViaOpenLink: boolean = true;
-  @State safeBottom: string = '0px';
+  @Local launchViaOpenLink: boolean = true;
+  @Local safeBottom: string = '0px';
+  /** 沉浸光感：跟随系统深/浅色模式（驱动输入框 rim 亮边与文字阴影） */
+  @Local isDark: boolean = false;
+  private themeMq: mediaquery.MediaQueryListener | null = null;
 
   aboutToAppear(): void {
     this.safeBottom = SafeArea.bottom();
+    try {
+      this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(display-mode: dark)');
+      this.isDark = this.themeMq.matches;
+      this.themeMq.on('change', (event: mediaquery.MediaQueryResult) => {
+        this.isDark = event.matches;
+      });
+    } catch (e) {
+      this.isDark = false;
+    }
     this.historyList = LinkHistoryUtil.load(SpKeys.APP_LINKING_HISTORY);
     this.launchViaOpenLink = PreferencesUtil.getBooleanSync(SpKeys.APP_LINK_LAUNCH_MODE, true);
     this.isScanVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_SCAN_PARSE, false);
@@ -40,8 +57,12 @@ export struct AppLinkingTool {
     }
   }
 
-  private doParse(): void {
-    this.parsedResult = URLParserUtil.parse(this.inputUrl);
+  aboutToDisappear(): void {
+    this.themeMq?.off('change');
+    this.themeMq = null;
+  }
+
+  private doParse(): void {    this.parsedResult = URLParserUtil.parse(this.inputUrl);
     if (!this.parsedResult.valid && this.inputUrl.trim().length > 0) {
       promptAction.showToast({ message: this.parsedResult.errorMessage || '无效的链接格式', duration: 1500 });
     } else if (this.parsedResult.valid) {
@@ -182,12 +203,9 @@ export struct AppLinkingTool {
   MainView() {
     Column({ space: 0 }) {
       Column({ space: 12 }) {
-        Text('App Linking 深度解析')
-          .fontSize(22)
-          .fontWeight(FontWeight.Bold)
-          .fontColor($r('sys.color.font_emphasize'))
-          .width('100%')
-          .padding({ left: 16, right: 16, top: 16 })
+        // ---------- 标题栏 ----------
+        PageHeader({ title: 'App Linking 解析', subtitle: '深度拆解元服务 / App 链接并测试拉起' })
+          .padding({ left: 16, right: 16, top: 8 })
 
         Column() {
           Row() {
@@ -212,10 +230,15 @@ export struct AppLinkingTool {
             .width('100%')
             .fontSize(13)
             .fontFamily('monospace')
+            .fontColor($r('sys.color.font_primary'))
+            .placeholderFont({ size: 13 })
+            .placeholderColor($r('sys.color.font_secondary'))
             .padding(12)
-            .backgroundColor($r('sys.color.comp_background_gray'))
-            .borderRadius(8)
-            .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
+            // 沉浸光感输入框：半透明 + 背景高斯模糊透上来（不要用不透明的 comp_background_gray）
+            .backgroundColor(ImmersiveStyles.inputBg())
+            .backdropBlur(ImmersiveStyles.inputBlur())
+            .borderRadius(ImmersiveStyles.inputRadius())
+            .border({ width: 1, color: ImmersiveStyles.inputRim(this.isDark) })
             .onChange((value: string) => {
               this.inputUrl = value;
             })
@@ -224,33 +247,34 @@ export struct AppLinkingTool {
         .padding({ left: 16, right: 16 })
 
         Row({ space: 12 }) {
-          Button() {
-            Text('扫码解析')
-              .fontSize(14)
-          }
-          .height(44)
-          .layoutWeight(1)
-          .borderRadius(8)
-          .visibility(this.isScanVisible ? Visibility.Visible : Visibility.None)
-          .onClick(() => this.startScan())
+          GlassButton({
+            label: '扫码解析',
+            btnHeight: 44,
+            fillWidth: true,
+            onAction: () => { this.startScan(); }
+          })
+            .layoutWeight(1)
+            .visibility(this.isScanVisible ? Visibility.Visible : Visibility.None)
 
-          Button() {
-            Text('解析')
-              .fontSize(14)
-          }
-          .height(44)
-          .layoutWeight(1)
-          .borderRadius(8)
-          .onClick(() => this.doParse())
+          GlassButton({
+            label: '解析',
+            btnHeight: 44,
+            fillWidth: true,
+            onAction: () => { this.doParse(); }
+          })
+            .layoutWeight(1)
 
-          Button() {
-            Text('测试拉起')
-              .fontSize(14)
-          }
-          .height(44)
-          .layoutWeight(1)
-          .borderRadius(8)
-          .onClick(() => this.launchDeepLink())
+          GlassButton({
+            label: '测试拉起',
+            btnHeight: 44,
+            fillWidth: true,
+            fontWeight: FontWeight.Medium,
+            bgColor: $r('sys.color.comp_background_emphasize'),
+            textColor: $r('sys.color.font_on_primary'),
+            strokeWidth: 0,
+            onAction: () => { this.launchDeepLink(); }
+          })
+            .layoutWeight(1)
         }
         .width('100%')
         .padding({ left: 16, right: 16 })
@@ -355,6 +379,8 @@ export struct AppLinkingTool {
 
   @Builder
   HistorySection() {
+    // 玻璃卡片：壁纸透出（原先是不透明的 background_secondary 纯色底）
+    GlassCard() {
     Column() {
       Row() {
         Circle({ width: 8, height: 8 })
@@ -413,15 +439,15 @@ export struct AppLinkingTool {
         .onClick(() => this.useHistoryItem(item))
       }, (item: LinkHistoryItem, index: number) => item.ts.toString() + '_' + index.toString())
     }
-    .width('100%')
-    .padding(14)
-    .backgroundColor($r('sys.color.background_secondary'))
-    .borderRadius(10)
-    .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
+      .width('100%')
+      .padding(14)
+    }
   }
 
   @Builder
   BasicInfoCard() {
+    // 玻璃卡片：壁纸透出（原先是不透明的 background_secondary 纯色底）
+    GlassCard() {
     Column() {
       Row() {
         Circle({ width: 8, height: 8 })
@@ -463,11 +489,9 @@ export struct AppLinkingTool {
       }
       .width('100%')
     }
-    .width('100%')
-    .padding(14)
-    .backgroundColor($r('sys.color.background_secondary'))
-    .borderRadius(10)
-    .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
+      .width('100%')
+      .padding(14)
+    }
   }
 
   @Builder
@@ -508,6 +532,8 @@ export struct AppLinkingTool {
 
   @Builder
   QueryParamsCard() {
+    // 玻璃卡片：壁纸透出（原先是不透明的 background_secondary 纯色底）
+    GlassCard() {
     Column() {
       Row() {
         Circle({ width: 8, height: 8 })
@@ -544,11 +570,9 @@ export struct AppLinkingTool {
         }, (param: ParsedQueryParam, index: number) => param.key + '_' + index.toString())
       }
     }
-    .width('100%')
-    .padding(14)
-    .backgroundColor($r('sys.color.background_secondary'))
-    .borderRadius(10)
-    .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
+      .width('100%')
+      .padding(14)
+    }
   }
 
   @Builder
@@ -606,6 +630,8 @@ export struct AppLinkingTool {
 
   @Builder
   DeepLinkCard() {
+    // 玻璃卡片：壁纸透出（原先是不透明的 background_secondary 纯色底）
+    GlassCard() {
     Column() {
       Row() {
         Circle({ width: 8, height: 8 })
@@ -661,11 +687,9 @@ export struct AppLinkingTool {
         .width('100%')
       }
     }
-    .width('100%')
-    .padding(14)
-    .backgroundColor($r('sys.color.background_secondary'))
-    .borderRadius(10)
-    .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
+      .width('100%')
+      .padding(14)
+    }
   }
 
   @Builder

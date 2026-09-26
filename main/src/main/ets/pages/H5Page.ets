@@ -10,6 +10,8 @@ import { URLParserUtil, ParsedQueryParam, ParsedURLResult } from '../utils/URLPa
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
 import { WallpaperHost } from '../components/WallpaperHost';
 import { ScanQrOverlay } from '../components/ScanQrOverlay';
+import { GlassButton } from '../components/GlassButton';
+import { GlassCard } from '../components/GlassCard';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 import { LinkHistoryUtil, LinkHistoryItem } from '../utils/UrlHistoryUtil';
 import { SpKeys } from '../constant/SpKeys';
@@ -361,7 +363,7 @@ export struct H5Page {
             .placeholderFont({ size: 13 })
             .placeholderColor($r('sys.color.font_secondary'))
             .padding(10)
-            .backgroundColor('rgba(128, 128, 128, 0.12)')
+            .backgroundColor(ImmersiveStyles.inputBg()).backdropBlur(ImmersiveStyles.inputBlur())
             .borderRadius(10)
             .onChange((value: string) => {
               this.inputUrl = value;
@@ -369,40 +371,38 @@ export struct H5Page {
 
           // 与 AppLinkingTool 一致：扫码解析 / 解析 / 打开（扫码入口受 ENABLE_SCAN_PARSE 开关控制）
           Row({ space: 10 }) {
-            Button() {
-              Text('扫码解析')
-                .fontSize(13)
-            }
-            .height(44)
-            .layoutWeight(1)
-            .borderRadius(8)
-            .backgroundColor($r('sys.color.comp_background_gray'))
-            .fontColor($r('sys.color.font_secondary'))
-            .visibility(this.isScanVisible ? Visibility.Visible : Visibility.None)
-            .onClick(() => {
-              this.isScanning = true;
+            GlassButton({
+              label: '扫码解析',
+              btnHeight: 44,
+              fontSize: 13,
+              fillWidth: true,
+              onAction: () => {
+                this.isScanning = true;
+              }
             })
+              .layoutWeight(1)
+              .visibility(this.isScanVisible ? Visibility.Visible : Visibility.None)
 
-            Button() {
-              Text('解析')
-                .fontSize(13)
-            }
-            .height(44)
-            .layoutWeight(1)
-            .borderRadius(8)
-            .backgroundColor($r('sys.color.comp_background_gray'))
-            .fontColor($r('sys.color.font_secondary'))
-            .onClick(() => this.doParse())
+            GlassButton({
+              label: '解析',
+              btnHeight: 44,
+              fontSize: 13,
+              fillWidth: true,
+              onAction: () => { this.doParse(); }
+            })
+              .layoutWeight(1)
 
-            Button() {
-              Text('打开 H5')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-            }
-            .height(44)
-            .layoutWeight(1)
-            .borderRadius(8)
-            .onClick(() => this.openH5())
+            GlassButton({
+              label: '打开 H5',
+              btnHeight: 44,
+              fontWeight: FontWeight.Medium,
+              fillWidth: true,
+              bgColor: $r('sys.color.comp_background_emphasize'),
+              textColor: $r('sys.color.font_on_primary'),
+              strokeWidth: 0,
+              onAction: () => { this.openH5(); }
+            })
+              .layoutWeight(1)
           }
           .width('100%')
         }
@@ -494,6 +494,8 @@ export struct H5Page {
 
   @Builder
   HistorySection() {
+    // 玻璃卡片：壁纸透出（原先是不透明的 background_secondary 纯色底）
+    GlassCard() {
     Column() {
       Row() {
         Circle({ width: 8, height: 8 })
@@ -552,15 +554,15 @@ export struct H5Page {
         .onClick(() => this.useHistoryItem(item))
       }, (item: LinkHistoryItem, index: number) => item.ts.toString() + '_' + index.toString())
     }
-    .width('100%')
-    .padding(14)
-    .backgroundColor($r('sys.color.background_secondary'))
-    .borderRadius(10)
-    .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
+      .width('100%')
+      .padding(14)
+    }
   }
 
   @Builder
   BasicInfoCard() {
+    // 玻璃卡片：壁纸透出（原先是不透明的 background_secondary 纯色底）
+    GlassCard() {
     Column() {
       Row() {
         Circle({ width: 8, height: 8 })
@@ -610,11 +612,9 @@ export struct H5Page {
       }
       .width('100%')
     }
-    .width('100%')
-    .padding(14)
-    .backgroundColor($r('sys.color.background_secondary'))
-    .borderRadius(10)
-    .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
+      .width('100%')
+      .padding(14)
+    }
   }
 
   @Builder
@@ -655,6 +655,8 @@ export struct H5Page {
 
   @Builder
   QueryParamsCard() {
+    // 玻璃卡片：壁纸透出（原先是不透明的 background_secondary 纯色底）
+    GlassCard() {
     Column() {
       Row() {
         Circle({ width: 8, height: 8 })
@@ -680,11 +682,9 @@ export struct H5Page {
         this.QueryParamRow(param, index, this.parsedResult.queryParams.length)
       }, (param: ParsedQueryParam, index: number) => param.key + '_' + index.toString())
     }
-    .width('100%')
-    .padding(14)
-    .backgroundColor($r('sys.color.background_secondary'))
-    .borderRadius(10)
-    .border({ width: 1, color: $r('sys.color.comp_background_emphasize') })
+      .width('100%')
+      .padding(14)
+    }
   }
 
   @Builder

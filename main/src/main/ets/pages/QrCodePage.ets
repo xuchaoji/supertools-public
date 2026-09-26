@@ -11,8 +11,9 @@ import { PreferencesUtil } from '@pura/harmony-utils';
 import { PageNames } from '../constant/PageNames';
 import { SpKeys } from '../constant/SpKeys';
 import { WallpaperHost } from '../components/WallpaperHost';
+import { GlassCard } from '../components/GlassCard';
+import { GlassButton } from '../components/GlassButton';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
-import { LightSense } from '../utils/LightSense';
 import { QrCodeUtil } from '../utils/QrCodeUtil';
 import { SafeArea } from '../utils/SafeArea';
 
@@ -301,7 +302,7 @@ export struct QrCodePage {
                 .fontColor($r('sys.color.font_primary'))
                 .placeholderFont({ size: 13 })
                 .placeholderColor($r('sys.color.font_secondary'))
-                .backgroundColor('rgba(128, 128, 128, 0.12)')
+                .backgroundColor(ImmersiveStyles.inputBg()).backdropBlur(ImmersiveStyles.inputBlur())
                 .borderRadius(10)
                 .padding(10)
                 .onChange((value: string) => {
@@ -309,31 +310,26 @@ export struct QrCodePage {
                 })
 
               Row({ space: 8 }) {
-                Button() {
-                  Row({ space: 4 }) {
-                    Text('清空')
-                      .fontSize(14)
+                GlassButton({
+                  label: '清空',
+                  fillWidth: true,
+                  onAction: () => {
+                    this.inputText = '';
                   }
-                }
-                .height(40)
-                .layoutWeight(1)
-                .backgroundColor($r('sys.color.comp_background_gray'))
-                .fontColor($r('sys.color.font_secondary'))
-                .onClick(() => {
-                  this.inputText = '';
                 })
+                  .layoutWeight(1)
 
-                Button() {
-                  Row({ space: 4 }) {
-                    Text(this.isGenerating ? '生成中…' : '生成二维码')
-                      .fontSize(14)
-                      .fontWeight(FontWeight.Medium)
-                  }
-                }
-                .height(40)
-                .layoutWeight(1.5)
-                .enabled(!this.isGenerating)
-                .onClick(() => this.generateQr(this.inputText))
+                GlassButton({
+                  label: this.isGenerating ? '生成中…' : '生成二维码',
+                  fillWidth: true,
+                  bgColor: $r('sys.color.comp_background_emphasize'),
+                  textColor: $r('sys.color.font_on_primary'),
+                  strokeWidth: 0,
+                  fontWeight: FontWeight.Medium,
+                  isEnabled: !this.isGenerating,
+                  onAction: () => { this.generateQr(this.inputText); }
+                })
+                  .layoutWeight(1.5)
               }
               .width('100%')
             }
@@ -365,33 +361,27 @@ export struct QrCodePage {
                   .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
                 Row({ space: 8 }) {
-                  Button() {
-                    Row({ space: 6 }) {
-                      Image($r('app.media.export'))
-                        .width(16)
-                        .height(16)
-                        .objectFit(ImageFit.Contain)
-                      Text('保存到相册')
-                        .fontSize(14)
-                        .fontWeight(FontWeight.Medium)
-                    }
-                  }
-                  .height(42)
-                  .layoutWeight(1)
-                  .enabled(!this.isSaving)
-                  .onClick(() => this.saveToAlbum())
+                  GlassButton({
+                    label: '保存到相册',
+                    fillWidth: true,
+                    iconRes: $r('app.media.export'),
+                    bgColor: $r('sys.color.comp_background_emphasize'),
+                    textColor: $r('sys.color.font_on_primary'),
+                    strokeWidth: 0,
+                    btnHeight: 42,
+                    fontWeight: FontWeight.Medium,
+                    isEnabled: !this.isSaving,
+                    onAction: () => { this.saveToAlbum(); }
+                  })
+                    .layoutWeight(1)
 
-                  Button() {
-                    Row({ space: 4 }) {
-                      Text('重新生成')
-                        .fontSize(14)
-                    }
-                  }
-                  .height(42)
-                  .layoutWeight(1)
-                  .backgroundColor($r('sys.color.comp_background_gray'))
-                  .fontColor($r('sys.color.font_secondary'))
-                  .onClick(() => this.generateQr(this.inputText))
+                  GlassButton({
+                    label: '重新生成',
+                    fillWidth: true,
+                    btnHeight: 42,
+                    onAction: () => { this.generateQr(this.inputText); }
+                  })
+                    .layoutWeight(1)
                 }
                 .width('100%')
               }
@@ -504,62 +494,5 @@ export struct QrCodePage {
       // 滚动到末尾时最后一张卡片会贴到屏幕底部，避让系统手势条
       .padding({ bottom: this.safeBottom })
     }
-  }
-}
-
-/**
- * 沉浸光感玻璃卡片：毛玻璃基底 + 光感渐变 + rim 亮边 + 柔和投影，
- * 与主页工具箱卡片使用同一套视觉配方，背景透出壁纸。
- */
-@ComponentV2
-struct GlassCard {
-  /** 卡片内容（渲染在玻璃层之上） */
-  @BuilderParam content: () => void;
-  @Local isDark: boolean = false;
-  private themeMq: mediaquery.MediaQueryListener | null = null;
-
-  aboutToAppear(): void {
-    try {
-      this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(display-mode: dark)');
-      this.isDark = this.themeMq.matches;
-      this.themeMq.on('change', (event: mediaquery.MediaQueryResult) => {
-        this.isDark = event.matches;
-      });
-    } catch (e) {
-      this.isDark = false;
-    }
-  }
-
-  aboutToDisappear(): void {
-    this.themeMq?.off('change');
-    this.themeMq = null;
-  }
-
-  build() {
-    // 玻璃样式直接作用于内容容器（同 SettingGroup 的单节点配方）：
-    // 内容决定高度，毛玻璃基底 + 光感渐变 + rim 亮边 + 柔和投影叠加在同一节点，
-    // 避免多层 Stack 的 height('100%') 在无高度约束的 Scroll 中撑满整个视口
-    Column() {
-      this.content()
-    }
-    .width('100%')
-    .borderRadius(ImmersiveStyles.cardRadius())
-    .clip(true)
-    .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
-    .backdropBlur(ImmersiveStyles.cardBlurRadius())
-    .linearGradient({
-      angle: 135,
-      colors: ImmersiveStyles.cardSurfaceColors(this.isDark)
-    })
-    .border({ width: ImmersiveStyles.cardRimWidth(), color: ImmersiveStyles.cardOuterRim(this.isDark) })
-    // 点光源光效（与工具箱卡片一致）
-    .visualEffect(LightSense.lightVisualEffect())
-    // 柔和投影（依据圆角边界生成）
-    .shadow({
-      radius: 14,
-      color: ImmersiveStyles.cardShadow(this.isDark),
-      offsetX: 0,
-      offsetY: 4
-    })
   }
 }

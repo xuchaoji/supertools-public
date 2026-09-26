@@ -1,5 +1,5 @@
 import { HMRouter } from "@hadss/hmrouter";
-import { PreferencesUtil, ToastUtil } from "@pura/harmony-utils";
+import { PreferencesUtil } from "@pura/harmony-utils";
 import { PageNames } from "../constant/PageNames";
 import { SpKeys } from "../constant/SpKeys";
 import { RecordModel } from "../model/RecordModel";
@@ -7,10 +7,13 @@ import { MyAVScreenCapture } from "../utils/MyAVScreenCapture";
 import { RecordViewModel } from "../viewmodel/RecordViewModel";
 import { RecordCard } from "../widgets/RecordCard";
 import { WallpaperHost } from "../components/WallpaperHost";
+import { PageHeader } from "../components/PageHeader";
+import { SafeArea } from "../utils/SafeArea";
 import { abilityAccessCtrl, Permissions } from "@kit.AbilityKit";
 import { BusinessError } from "@kit.BasicServicesKit";
 import { audio } from "@kit.AudioKit";
 import { BackgroundServiceManager } from "../utils/BackgroundServiceManager";
+import { Toast } from "../utils/Toast";
 
 const TAG: string = 'ArkTSAVScreenCapture'
 const START_RECORD_DELAY: number = 3;
@@ -20,6 +23,8 @@ const permissions: Array<Permissions> = ['ohos.permission.MICROPHONE', 'ohos.per
 @ComponentV2
 export struct ScreenRecordPage {
   @Local viewModel: RecordViewModel = RecordViewModel.getInstance();
+  /** 页面出现时缓存底部安全区，避免 build 中同步查询窗口服务 */
+  @Local safeBottom: string = '0px';
   private filesDir = this.getUIContext().getHostContext()?.filesDir;
 
   audioManager = audio.getAudioManager();
@@ -27,6 +32,7 @@ export struct ScreenRecordPage {
   strategy: audio.AudioSessionStrategy = { concurrencyMode: audio.AudioConcurrencyMode.CONCURRENCY_DUCK_OTHERS };
 
   aboutToAppear(): void {
+    this.safeBottom = SafeArea.bottom();
     if (PreferencesUtil.getBooleanSync(SpKeys.PRIVACY_AGREE)) {
       this.requestPermissions();
     }
@@ -35,6 +41,11 @@ export struct ScreenRecordPage {
   build() {
     // 全局壁纸宿主：录屏页也继承主页壁纸背景（根背景透明让壁纸透出）
     WallpaperHost() {
+      Column() {
+        // ---------- 标题栏 ----------
+        PageHeader({ title: '录屏', subtitle: '高清无压缩录屏，完成后自动保存到图库' })
+          .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+
       RelativeContainer() {
         // 视频列表区域
         RelativeContainer() {
@@ -85,8 +96,13 @@ export struct ScreenRecordPage {
       .alignRules({ bottom: { anchor: '__container__', align: VerticalAlign.Bottom } })
     }
     .backgroundColor(Color.Transparent)
+    .layoutWeight(1)
     .width('100%')
-    .height('100%')
+      }
+      .width('100%')
+      .height('100%')
+      // 底部手势条避让：控制区不再被系统手势条压住
+      .padding({ bottom: this.safeBottom })
     }
   }
 
@@ -100,7 +116,7 @@ export struct ScreenRecordPage {
 
   private async toggleRecordAction() {
     if (!this.viewModel.isInRecording) {
-      ToastUtil.showToast(`${START_RECORD_DELAY} 秒后开始录制`);
+      Toast.show(`${START_RECORD_DELAY} 秒后开始录制`);
       await this.audioSessionManager.activateAudioSession(this.strategy);
       BackgroundServiceManager.startRecordingTask();
       setTimeout(() => {

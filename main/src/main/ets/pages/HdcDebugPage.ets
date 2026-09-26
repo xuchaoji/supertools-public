@@ -10,6 +10,7 @@ import { promptAction, mediaquery } from '@kit.ArkUI';
 import fs from '@ohos.file.fs';
 import { picker } from '@kit.CoreFileKit';
 import { WallpaperHost } from '../components/WallpaperHost';
+import { GlassButton } from '../components/GlassButton';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
 import { SafeArea } from '../utils/SafeArea';
 
@@ -666,24 +667,33 @@ export struct HdcDebugPage {
         TextInput({ placeholder: "IP address (本机调试填 127.0.0.1)", text: this.connectIp })
           .onChange((v: string) => { this.connectIp = v; })
           .fontSize(12).fontFamily("monospace").layoutWeight(3).height(36)
-          .backgroundColor("sys.color.background_primary").borderRadius(6)
-          .border({ width: 1, color: "sys.color.comp_background_emphasize" })
+          .backgroundColor(ImmersiveStyles.inputBg()).backdropBlur(ImmersiveStyles.inputBlur()).borderRadius(ImmersiveStyles.inputRadius())
+          .border({ width: 1, color: ImmersiveStyles.inputRim(this.isDark) })
+          .fontColor($r('sys.color.font_primary'))
           .padding({ left: 8, right: 8 })
 
         TextInput({ placeholder: "Port", text: this.connectPort })
           .onChange((v: string) => { this.connectPort = v; })
           .fontSize(12).fontFamily("monospace").layoutWeight(1).height(36)
-          .backgroundColor("sys.color.background_primary").borderRadius(6)
-          .border({ width: 1, color: "sys.color.comp_background_emphasize" })
+          .backgroundColor(ImmersiveStyles.inputBg()).backdropBlur(ImmersiveStyles.inputBlur()).borderRadius(ImmersiveStyles.inputRadius())
+          .border({ width: 1, color: ImmersiveStyles.inputRim(this.isDark) })
+          .fontColor($r('sys.color.font_primary'))
           .type(InputType.Number)
           .padding({ left: 6, right: 6 })
 
-        Button(this.isConnected ? "Recon" : "Conn")
-          .fontSize(12).fontColor(Color.White)
-          .backgroundColor(!this.isRunning ? "#28A745" : "#CCCCCC")
-          .borderRadius(6).height(36).padding({ left: 8, right: 8 })
-          .enabled(!this.isRunning)
-          .onClick(() => { this.connectDevice(); })
+        GlassButton({
+          label: this.isConnected ? "Recon" : "Conn",
+          bgColor: !this.isRunning ? "#28A745" : "#CCCCCC",
+          textColor: Color.White,
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 36,
+          radius: 6,
+          fontSize: 12,
+          padX: 8,
+          isEnabled: !this.isRunning,
+          onAction: () => { this.connectDevice(); }
+        })
       }.width("100%").padding({ top: 6, bottom: 4 })
     }
   }
@@ -916,15 +926,31 @@ export struct HdcDebugPage {
       this.inputField()
 
       if (this.isRunning) {
-        Button("Cancel")
-          .fontSize(13).fontColor(Color.White)
-          .backgroundColor("#E53935").borderRadius(8).height(40).padding({ left: 12, right: 12 })
-          .onClick(() => { this.cancelCommand(); })
+        GlassButton({
+          label: "Cancel",
+          bgColor: "#E53935",
+          textColor: Color.White,
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 40,
+          radius: 8,
+          fontSize: 13,
+          padX: 12,
+          onAction: () => { this.cancelCommand(); }
+        })
       } else {
-        Button("Send")
-          .fontSize(13).fontColor(Color.White)
-          .backgroundColor("#007AFF").borderRadius(8).height(40).padding({ left: 14, right: 14 })
-          .onClick(() => { this.executeCommand(); })
+        GlassButton({
+          label: "Send",
+          bgColor: "#007AFF",
+          textColor: Color.White,
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 40,
+          radius: 8,
+          fontSize: 13,
+          padX: 14,
+          onAction: () => { this.executeCommand(); }
+        })
       }
     }.width("100%").padding({ top: 6 })
   }

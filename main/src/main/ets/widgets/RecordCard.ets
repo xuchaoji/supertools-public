@@ -2,12 +2,13 @@ import { PhotoHelper } from "@pura/picker_utils";
 import { RecordModel } from "../model/RecordModel";
 import { formatVideoTime } from "../utils/TimeUtils";
 import { photoAccessHelper } from "@kit.MediaLibraryKit";
-import { DateUtil, DialogAction, DialogUtil, FileUtil, ToastUtil } from "@pura/harmony-utils";
+import { DateUtil, DialogAction, DialogUtil, FileUtil } from "@pura/harmony-utils";
 import { BusinessError } from "@ohos.base";
 import { fileIo } from "@kit.CoreFileKit";
 import { Context } from "@kit.AbilityKit";
 import { RecordViewModel } from "../viewmodel/RecordViewModel";
 import { audio } from "@kit.AudioKit";
+import { Toast } from "../utils/Toast";
 
 const TAG: string = 'RecordCard'
 
@@ -139,12 +140,12 @@ export struct RecordCard {
             secondaryButton: "确定",
             onAction: (action) => {
               if (action == DialogAction.ONE) {
-                ToastUtil.showToast("取消删除")
+                Toast.show("取消删除")
               } else if (action == DialogAction.TWO) {
                 deleteFile(this.repeatRecordItem.item.filePath)
                   .then((result) => {
                     if (result) {
-                      ToastUtil.showToast('删除成功');
+                      Toast.show('删除成功');
                       let index: number = RecordViewModel.getInstance().recordings.findIndex((recordModel) => {
                         recordModel.filePath === this.repeatRecordItem.item.filePath
                       })
@@ -165,7 +166,7 @@ export struct RecordCard {
             console.log(TAG, `onSaveIcon click`)
             saveRecord(this.getUIContext().getHostContext() as Context, this.repeatRecordItem.item.filePath)
               .then(() => {
-                ToastUtil.showToast('保存成功')
+                Toast.show('保存成功')
               })
           })
 

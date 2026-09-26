@@ -231,6 +231,8 @@ capabilities/
 | `BackgroundTaskUtil.ets` | 后台保活工具 (DATA_TRANSFER 模式, 旧版备用) | 静态 init + 静态方法 |
 | `WebServerUtil.ets` | 嵌入式 HTTP 服务器 (TCP Socket, 目录列表, 拖拽上传, MIME, 频控) | Singleton |
 | `TimeUtils.ets` | 时间格式化 (formatVideoTime → mm:ss) | 导出函数 |
+| `Toast.ets` | **全局轻提示唯一出口** (`Toast.show(msg, duration?)`，走 `UIContext.getPromptAction()`) | 静态方法 |
+| `SafeArea.ets` | 底部手势条避让 (`SafeArea.bottom()` → `"84px"`) | 静态方法 |
 
 ### 4.4 事件驱动通信
 
@@ -381,6 +383,185 @@ hdc shell "uitest dumpLayout -p /data/local/tmp/l.xml"  # 看元素 bounds 是�
 - `List` / `Scroll` 是否 `layoutWeight(1)` 一直铺到屏底？→ 需要容器级 bottom padding。
 - 滚动列表滚动到末尾后，最后一个元素是否仍被手势条盖住？
 - 全屏 `Web` / 相机预览可以铺到屏底（沉浸式是预期设计），其余内容不行。
+
+### 5.8 样式契约（新建/改造子页面必须遵守）
+
+历史包袱：项目里同时存在 V1/V2 组件模型、四份「玻璃卡片」配方、两套 Toast API、
+以及有/无返回按钮两种页面骨架，视觉与交互都在分裂。现已收敛出**唯一实现**，
+新页面照抄下面这套骨架即可，**不要再自建卡片、不要再直接调 Toast API**：
+
+| 关注点 | 唯一实现 | 说明 |
+|---|---|---|
+| 组件模型 | `@ComponentV2` + `@Local` / `@Param` / `@Event` | V1 仅存于尚未迁移的旧页面 |
+| 页面背景 | `components/WallpaperHost.ets` | 根节点包一层，内容容器 `backgroundColor(Color.Transparent)` |
+| 页面标题栏 | `components/PageHeader.ets` | 玻璃圆底返回键 + 标题 + 副标题；`Index` 已 `hideNavBar(true)`，**不写标题栏就没有可见返回键** |
+| 卡片 | `components/GlassCard.ets` | 沉浸光感唯一配方（基底→毛玻璃→光感渐变→rim 亮边→点光源→投影） |
+| 按钮 | `components/GlassButton.ets` | 内层高斯模糊背景透上来；可配 `bgColor`/`textColor`/`strokeWidth`/`strokeColor`/`blurRadius`/`padX` |
+| 输入框 | `utils/ImmersiveStyles.ets` 的 `inputBg/inputBlur/inputRim/inputRadius` | 半透明底 + 背景高斯模糊 + rim 亮边；**禁止**再用不透明的 `comp_background_gray` / `background_primary` |
+| 分组列表 | `components/SettingGroup.ets` | 需要自动分割线的设置项用这个（同一配方的 List 变体） |
+| 轻提示 | `utils/Toast.ets` 的 `Toast.show('...')` | 走 `UIContext.getPromptAction()`；**禁止**再用 `promptAction.showToast` / `ToastUtil` |
+| 底部安全区 | `utils/SafeArea.ets` 的 `SafeArea.bottom()` | 带 `px` 单位字符串，页面自己加 |
+
+标准骨架（以 `pages/StringConverter.ets` 为参考实现）：
+
+```typescript
+build() {
+  WallpaperHost() {
+    Scroll() {
+      Column({ space: 12 }) {
+        PageHeader({ title: '页面标题', subtitle: '一句话说明' })
+        GlassCard() {
+          Column({ space: 10 }) { /* ... */ }.width('100%').padding(12)
+        }
+      }
+      .width('100%').alignItems(HorizontalAlign.Start)
+      .constraintSize({ maxWidth: 800 })
+      .padding({ left: 16, right: 16, top: 8, bottom: 24 })
+    }
+    .width('100%').height('100%')
+    .align(Alignment.Top)
+    .padding({ bottom: this.safeBottom })
+  }
+}
+```
+
+> `WallpaperHost` / `ImmersiveGlassCard` 仍是 V1 实现：前者是页面背景宿主（V1/V2 页面都能用），
+> 后者是**旧的自绘玻璃卡片**，只剩 `FloatBallPage` 在用，新代码一律用 `GlassCard`。
+
+**按钮用法（`GlassButton`）**：默认即玻璃态（模糊层 + 光感基底 + rim 亮边），
+主按钮通过覆盖底色/文字色表达，**不要再手写 `Button(){...}.backgroundColor(...)`**：
+
+```typescript
+// 次要按钮：默认玻璃态（背景模糊后透上来）；父容器给了宽度 → fillWidth: true
+GlassButton({ label: '清空', fillWidth: true, onAction: () => { this.inputText = '' } })
+  .layoutWeight(1)
+
+// 主要按钮：覆盖底色与文字色、去掉描边
+GlassButton({
+  label: '生成二维码',
+  fillWidth: true,
+  bgColor: $r('sys.color.comp_background_emphasize'),
+  textColor: $r('sys.color.font_on_primary'),
+  strokeWidth: 0,
+  fontWeight: FontWeight.Medium,
+  isEnabled: !this.isGenerating,
+  onAction: () => { this.generateQr(this.inputText); }
+})
+  .layoutWeight(1.5)
+```
+
+**`fillWidth` 怎么定（最容易漏，漏了就"按钮宽度不齐"）**：
+
+| 调用处给了什么 | `fillWidth` |
+|---|---|
+| `.layoutWeight(n)` / `.width(...)` / `.width('40%')` / 放在 `GridItem` 里 | **必须 `true`** |
+| 父容器按内容排列（Row + `Blank()` / `SpaceBetween`，不设宽度） | **必须 `false`**（默认） |
+
+> 原因：父容器把宽度分配给了**自定义组件的包装节点**（dump 里的 `__Common__`），
+> 而可见的玻璃层是组件内部的根节点。`fillWidth: false` 时它按内容宽度收缩
+> → 胶囊粗细不齐、四周留出看不见的空白（实测 H5Page 三颗填充率只有 60% / 32% / 55%）；
+> `fillWidth: true` 时它撑满被分配的宽度。**反过来**在按内容排列的行里用 `true`，
+> 会撑满可用宽度并把后面的兄弟节点挤出屏幕（`LocalWebPage` 操作行踩过）。
+>
+> 实测参照（像素真值）：H5Page 三颗 271/272/273，QrCodePage 348:528 ≈ 1:1.5，
+> StringConverter 2×2 各 431/433，LocalWebPage 内容宽 165/248/168。
+
+> **两个硬约束**（都踩过）：
+> 1. 自定义组件的成员名**不能与 ArkUI 通用属性同名**——`borderWidth` / `borderColor` /
+>    `enabled` / `height` 会报 `Property 'x' is not assignable to the same property in base
+>    type 'CustomComponent'`，所以这里是 `strokeWidth` / `strokeColor` / `isEnabled` / `btnHeight`。
+>    新增自研组件时先避开通用属性名。
+> 2. **带尾随块（`@BuilderParam`）的自定义组件后面不能继续挂属性**：`GlassCard() { … }.margin(16)`
+>    会报 `Declaration or statement expected`；需要外距就把 margin 挂到外层容器，或把组件写成
+>    纯参数式（如 `GlassButton` / `PageHeader`），参数式组件可以正常链式挂 `.layoutWeight()`。
+> 3. **自研组件内部不要用百分比尺寸的子节点当背景层**：`Stack { Column().width('100%') + 内容 }`
+>    会让 Stack 反过来撑满父容器的可用宽度——调用方没给宽度时（如 `LocalWebPage` 的操作行）
+>    按钮会被拉宽、把后面的按钮挤出屏幕。背景/模糊直接挂在内容容器上（**单节点配方**，同 `GlassCard`）。
+> 4. **`onAction`/回调里用块体**：`() => this.foo()` 这种表达式体要求 `foo` 有显式返回类型声明，
+>    否则触发 `arkts-no-implicit-return-types`；统一写 `() => { this.foo(); }`。
+> 5. **宽度不确定的容器里不要靠 `layoutWeight` 等分**：`GlassCard` 的宽度可能是**内容驱动**的
+>    （实测同一页三张卡片：输入卡 988px、操作卡 806px、输出卡 988px——只有内容里有百分比子节点的
+>    那两张拿到了全宽）。在这种卡片里给按钮加 `layoutWeight(1)`，等分会算歪并溢出行边界
+>    （实测 `StringConverter` 2×2：442 / 300，第二列被卡片裁掉右侧）。
+>    **对策：用百分比宽度**（`.width('48%')` + 行 `justifyContent(SpaceBetween)`），
+>    百分比会按可用宽度解析，与同页 `TextArea`/`width('100%')` 按钮拿到 908 是同一机制。
+>    `layoutWeight` 只在宽度确定的容器里用（普通 `Row`、对话框等，均已像素验证正确）。
+
+**输入框写法（`TextArea` / `TextInput`）**：底色必须是**半透明**的，让卡片/壁纸透上来；
+`comp_background_gray`、`background_primary` 这类不透明色会让输入框变成一块纯色贴片
+（AppLinkingTool / LocalWebPage / HdcDebugPage 都踩过）：
+
+```typescript
+TextArea({ text: this.inputUrl, placeholder: '输入…' })
+  .fontColor($r('sys.color.font_primary'))
+  .placeholderColor($r('sys.color.font_secondary'))
+  .padding(12)
+  .backgroundColor(ImmersiveStyles.inputBg())        // rgba(128,128,128,0.12)
+  .backdropBlur(ImmersiveStyles.inputBlur())         // 背景高斯模糊后透上来
+  .borderRadius(ImmersiveStyles.inputRadius())
+  .border({ width: 1, color: ImmersiveStyles.inputRim(this.isDark) })
+```
+
+> 需要 `this.isDark` 的页面要自己订阅一次深浅色（`mediaquery.matchMediaSync('(display-mode: dark)')`），
+> 并在 `aboutToDisappear` 里 `off('change')`。全应用输入框已统一走这套（含 `H5Page` / `QrCodePage` /
+> `StringConverter` / `AppLinkingTool` / `LocalWebPage` 对话框与编辑器 / `HdcDebugPage` 的 IP·Port）。
+> **例外**：`HdcDebugPage` 终端内的命令行输入框保持不透明——它嵌在不透明的控制台面里，
+> 单独改会与所在面板割裂。
+
+**全应用按钮已统一到 `GlassButton`**（源码里已无原生 `Button(`）。新增按钮时必须用 `GlassButton`，
+默认即玻璃态；按下表决定是否需要覆盖参数：
+
+| 场景 | 传参 |
+|---|---|
+| 中性/次要操作（清空、刷新、导入、取消…） | 不传颜色，用默认玻璃态 |
+| 主操作（生成、保存、打开、测试拉起…） | `bgColor: $r('sys.color.comp_background_emphasize')` + `textColor: $r('sys.color.font_on_primary')` + `strokeWidth: 0` |
+| 有语义词的实色（启动负载绿/红、Conn 绿、Send 蓝、取消扫码灰） | 传原 `bgColor`/`textColor` + `strokeWidth: 0` + `blurRadius: 0`（相机/裁剪浮层上不要模糊） |
+| 透明"幽灵"按钮（文件行 ⚙️ 菜单、编辑器工具栏） | `bgColor: Color.Transparent` + `strokeWidth: 0` + `blurRadius: 0` |
+
+> 注意：`Text` 当按钮用的**文字链接**（HDC 的 `Copy`/`Clear`、历史条目的 `✕`/`清空`、
+> 工具箱卡的 `[清空]` 等）**不在** `GlassButton` 范围内，它们是有意的纯文字样式，不要一起替换。
+
+**尚未迁移（风格分裂的剩余部分）**：
+
+| 文件 | 卡在哪 |
+|---|---|
+| `pages/Index.ets` | V1 根容器，`@StorageProp('WallpaperPath'/'WallpaperBlur') + @Watch`。V2 不支持 `@StorageProp`，必须与 `components/WallpaperHost.ets`、写入方 `pages/HomePage.ets`（`AppStorage.setOrCreate`）**一起**改到 `AppStorageV2` + `@ObservedV2` 状态类，否则壁纸在子页面失效 |
+| `components/WallpaperHost.ets` | 同上（9 个页面依赖它渲染背景，改错=全站背景异常） |
+| `pages/FloatBallPage.ets` | V1 浮窗，`@StorageProp('RecentAccessFile')` 跑马灯；写入方是 `utils/WebServerUtil.ets`，同样要一起改成 V2 状态类 |
+| `components/ImmersiveGlassCard.ets` | 旧的自绘玻璃卡片，仅 `FloatBallPage` 引用；随 `FloatBallPage` 迁移一起下线 |
+
+> 这四处属于**同一个 AppStorage 契约迁移**，收益是纯内部一致性（用户看不到差别），
+> 代价是动到应用根容器与全站背景；必须一次性做完并做壁纸/跑马灯的端到端回归
+> （壁纸要手动在设置页选图，无法纯脚本验证）。建议与「深浅色订阅去重（统一为单一
+> `@ObservedV2` 主题源）」合并成一次改动。
+>
+> 已迁移的：`StringConverter`、`AppLinkingTool`（原 V1 页面）、`CalcPage` 的 `LogPanel`、
+> `FloatClockPage`（浮窗）；`StressCapsulePage` 本来就是 V2。
+
+**真机回归基线（每次改页面骨架后照这个过一遍）**：
+
+```powershell
+# 1. 进页面后 dump，断言「主标题 + 副标题 + 左上角返回键 Image」三件套
+hdc shell "uitest dumpLayout -p /data/local/tmp/p.xml -b com.xuchaoji.hmos.supertools.dev"
+# 2. 点返回键中心，再 dump，断言回到工具箱主页（Text '工具箱' 存在）
+# 3. 功能回归：输入 → 点主按钮 → dump 断言结果文本（V1→V2 迁移最容易坏的是 @Local 响应式）
+# 4. 崩溃检查
+hdc shell "hilog -x -e 'GlassCard|PageHeader|jscrash' -L E"
+```
+
+> **改布局/宽度时必须量几何，不能只断言"文字存在"**（这条是踩出来的）：
+> `dumpLayout` 只证明节点在、坐标可点，**不证明按钮自身宽高对不对**。
+> 判断按钮宽度要取「可见玻璃层（`Text` 的父节点）bounds」与「它的包装节点 `__Common__` bounds」，
+> 算填充率；期望填充的按钮应 ≈100%，按内容排列的应 ≈文字宽 + 2×padX。
+>
+> **dump 的坑**：同一个 `Row` 里**第 2 个及以后的自定义组件**，bounds 会上报成被裁剪/错位的样子
+> （实测 `StringConverter` 第二列报 [560,1125][996,1206]，而 `snapshot_display` 像素显示它与第一列
+> 同高同宽）。**结论：dump 用来定位与点击，宽度/高度争议一律用截图取像素真值**：
+>
+> ```powershell
+> hdc shell "snapshot_display -f /data/local/tmp/x.jpeg"; hdc file recv /data/local/tmp/x.jpeg .
+> # System.Drawing 读图；在按钮行 y 上按列统计"亮边像素占比"找竖直边缘，或按颜色连贯段找胶囊左右边界
+> ```
 
 ---
 
@@ -1276,7 +1457,10 @@ $r('app.string.setting_tab')
 
 | 文件 | 组件 | 模式 | 说明 |
 |---|---|---|---|
-| `ImmersiveGlassCard.ets` | `ImmersiveGlassCard` | v1 | 毛玻璃卡片 (zHeight/zRadius/theme/content 插槽) |
+| `GlassCard.ets` | `GlassCard` | V2 | **沉浸光感卡片唯一实现**（基底/毛玻璃/光感渐变/rim/点光源/投影），内容内边距由调用方给 |
+| `GlassButton.ets` | `GlassButton` | V2 | **按钮唯一实现**：内层高斯模糊背景透上来；可配底色/文字色/描边宽/描边色/模糊半径/高度/字号/圆角/是否可点 |
+| `PageHeader.ets` | `PageHeader` | V2 | **页面标题栏唯一实现**（玻璃圆底返回键 + 标题 + 副标题；默认 `HMRouterMgr.pop()`，可传 `onBack`） |
+| `ImmersiveGlassCard.ets` | `ImmersiveGlassCard` | v1 | 旧的自绘玻璃卡片（仅 `FloatBallPage` 在用，新代码用 `GlassCard`） |
 | `SettingGroup.ets` | `SettingGroup` | V2 | 设置项分组容器 (自动分割线, `@BuilderParam` 插槽) |
 | `SettingSwitchItem.ets` | `SettingSwitchItem` | V2 | 开关设置行 (title + Toggle + onChange 事件) |
 | `StressCapsule.ets` | `StressCapsule` | V2 | 悬浮压测面板 (拖拽 + 圆环 + 启停 + PanGesture 强度调节) |

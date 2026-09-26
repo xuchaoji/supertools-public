@@ -8,6 +8,8 @@ import { common } from '@kit.AbilityKit';
 import statfs from '@ohos.file.statvfs';
 import { connection } from '@kit.NetworkKit';
 import { WallpaperHost } from '../components/WallpaperHost';
+import { PageHeader } from '../components/PageHeader';
+import { SafeArea } from '../utils/SafeArea';
 
 const TAG: string = 'DeviceInfoPage';
 
@@ -43,9 +45,12 @@ export struct DeviceInfoPage {
   @Local networkItems: InfoItem[] = [];
   @Local memory: MemoryState = new MemoryState();
   @Local battery: BatteryState = new BatteryState();
+  /** 页面出现时缓存底部安全区，避免 build 中同步查询窗口服务 */
+  @Local safeBottom: string = '0px';
   private refreshTimer: number = -1;
 
   aboutToAppear(): void {
+    this.safeBottom = SafeArea.bottom();
     this.collectDeviceInfo();
     this.collectDisplayInfo();
     this.collectStorageInfo();
@@ -199,6 +204,10 @@ export struct DeviceInfoPage {
         Column() {
           Scroll() {
             Column({ space: '4vp' }) {
+              // ---------- 标题栏 ----------
+              PageHeader({ title: '设备信息', subtitle: '系统、屏幕、电池等硬件参数' })
+                .margin({ top: '12vp' })
+
               this.StaticSection('设备信息', this.deviceItems)
               this.StaticSection('屏幕信息', this.displayItems)
 
@@ -304,6 +313,8 @@ export struct DeviceInfoPage {
       .scrollBar(BarState.Auto)
       .layoutWeight(1)
       .width('100%')
+      // 滚动到末尾时最后一个分组会贴到屏幕底部，避让系统手势条
+      .padding({ bottom: this.safeBottom })
     }
     .width('100%')
     .height('100%')

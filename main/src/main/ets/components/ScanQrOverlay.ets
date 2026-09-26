@@ -5,6 +5,7 @@ import { camera } from '@kit.CameraKit';
 import { display } from '@kit.ArkUI';
 import { customScan, scanCore, scanBarcode } from '@kit.ScanKit';
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
+import { GlassButton } from './GlassButton';
 
 const TAG: string = 'ScanQrOverlay';
 
@@ -235,17 +236,23 @@ export struct ScanQrOverlay {
           .opacity(0.8)
           .margin({ bottom: 24 })
 
-        Button('取消扫码')
-          .fontSize(16)
-          .fontColor($r('sys.color.font_on_primary'))
-          .backgroundColor('rgba(128, 128, 128, 0.2)')
-          .borderRadius(24)
-          .height(48)
+        GlassButton({
+          label: '取消扫码',
+          fillWidth: true,
+          bgColor: 'rgba(128, 128, 128, 0.2)',
+          textColor: $r('sys.color.font_on_primary'),
+          strokeWidth: 0,
+          // 相机预览上做背景模糊没有意义，保持原观感
+          blurRadius: 0,
+          btnHeight: 48,
+          radius: 24,
+          fontSize: 16,
+          onAction: () => {
+            this.cancelScan();
+          }
+        })
           .width('60%')
           .margin({ bottom: 56 })
-          .onClick(() => {
-            this.cancelScan();
-          })
       }
       .width('100%')
       .height('100%')

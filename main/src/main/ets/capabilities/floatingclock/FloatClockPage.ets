@@ -1,9 +1,9 @@
 import { FloatDragHandler } from '../../utils/FloatDragHandler';
 
 @Entry
-@Component
+@ComponentV2
 struct FloatClockPage {
-  @State timeStr: string = "00:00:00.000";
+  @Local timeStr: string = "00:00:00.000";
   private intervalId: number = -1;
   private dragHandler: FloatDragHandler = new FloatDragHandler('HyperEntropy_Float_Clock');
 

@@ -12,6 +12,7 @@ import { BackgroundServiceManager } from '../utils/BackgroundServiceManager';
 import { GlobalContextHolder } from '../utils/GlobalContextHolder';
 import { TargetConstants } from 'main/ets/TargetConstants';
 import { SafeArea } from '../utils/SafeArea';
+import { GlassButton } from '../components/GlassButton';
 
 const TAG: string = 'PrivacyPage';
 
@@ -148,31 +149,45 @@ export struct PrivacyPage {
 
       // 底部按钮区域
       Row() {
-        Button('拒绝', { type: ButtonType.Normal })
-          .width('40%')
-          .height(50)
-          .backgroundColor('#F0F0F0')
-          .fontColor('#333333')
-          .borderRadius(25)
-          .onClick(() => {
+        GlassButton({
+          label: '拒绝',
+          fillWidth: true,
+          bgColor: '#F0F0F0',
+          textColor: '#333333',
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 50,
+          radius: 25,
+          fontSize: 16,
+          onAction: () => {
             this.saveUserAgreement(false);
             // 关闭当前页面（退出应用）
             HMRouterMgr.pop()
-          })
-
-        Button('同意', { type: ButtonType.Capsule })
+          }
+        })
           .width('40%')
-          .height(50)
-          .backgroundColor('#007DFF')
-          .fontColor(Color.White)
-          .margin({ left: 20 })
-          .onClick(() => {
+
+        GlassButton({
+          label: '同意',
+          fillWidth: true,
+          bgColor: '#007DFF',
+          textColor: Color.White,
+          strokeWidth: 0,
+          blurRadius: 0,
+          btnHeight: 50,
+          radius: 25,
+          fontSize: 16,
+          fontWeight: FontWeight.Medium,
+          onAction: () => {
             this.saveUserAgreement(true);
             // 跳转到主页面
             HMRouterMgr.replace({
               pageUrl: PageNames.HOME_PAGE
             })
-          })
+          }
+        })
+          .width('40%')
+          .margin({ left: 20 })
       }
       .width('100%')
       .padding(20)

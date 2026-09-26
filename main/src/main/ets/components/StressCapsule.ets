@@ -3,6 +3,7 @@ import { StressKernel } from '../capabilities/floatingstress/StressKernel';
 // 引入公共拖拽处理类 (根据你的实际路径调整)
 import { FloatDragHandler } from '../utils/FloatDragHandler';
 import { StressRing } from './StressRing';
+import { GlassButton } from './GlassButton';
 
 const MAX_VISUAL_MEM: number = Number(hidebug.getSystemMemInfo().totalMem) / 1024;
 
@@ -154,13 +155,19 @@ export struct StressCapsule {
           Text(`${this.intensity.toFixed(0)}%`)
             .fontSize(8).fontWeight(FontWeight.Bold).fontColor('#99FFFFFF').margin({ bottom: 2 })
 
-          Button({ type: ButtonType.Capsule }) {
-            Text(this.isActive ? "■" : "▶")
-              .fontSize(10).fontColor(Color.White)
-          }
-          .width(22).height(22)
-          .backgroundColor(this.isActive ? '#99E53935' : '#9943A047')
-          .onClick(() => this.toggleStress())
+          GlassButton({
+            label: this.isActive ? '■' : '▶',
+            fillWidth: true,
+            bgColor: this.isActive ? '#99E53935' : '#9943A047',
+            textColor: Color.White,
+            strokeWidth: 0,
+            blurRadius: 0,
+            btnHeight: 22,
+            radius: 11,
+            fontSize: 10,
+            onAction: () => { this.toggleStress(); }
+          })
+            .width(22)
         }
         .width(48)
         .height('auto')

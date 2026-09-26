@@ -7,6 +7,9 @@ import { CalcMsgData } from '../model/CalcMsgData';
 import { StatusIndicator } from '../widgets/StatusIndicator';
 import { hidebug } from '@kit.PerformanceAnalysisKit';
 import { WallpaperHost } from '../components/WallpaperHost';
+import { PageHeader } from '../components/PageHeader';
+import { GlassButton } from '../components/GlassButton';
+import { SafeArea } from '../utils/SafeArea';
 
 const TAG: string = 'CalcPageTag';
 
@@ -28,6 +31,8 @@ export struct CalcPage {
   @Local memoryUsage: number = 0;
   @Local temperature: number = 28;
   @Local logs: string[] = [];
+  /** 页面出现时缓存底部安全区，避免 build 中同步查询窗口服务 */
+  @Local safeBottom: string = '0px';
   // 设备状态模拟
   private timerId: number = 0;
   private addLogTime: number = 0;
@@ -38,6 +43,7 @@ export struct CalcPage {
   }
 
   aboutToAppear(): void {
+    this.safeBottom = SafeArea.bottom();
     this.startMonitoring();
   }
 
@@ -158,11 +164,9 @@ export struct CalcPage {
     Stack() {
       WallpaperHost() {
         Column() {
-          // 标题
-          Text('设备高负载模拟器')
-            .fontSize(24)
-            .fontWeight(FontWeight.Bold)
-            .margin({ top: 20, bottom: 10 });
+          // 标题栏
+          PageHeader({ title: '设备高负载模拟器', subtitle: '多 Worker 线程计算，模拟设备满载场景' })
+            .margin({ top: 8, bottom: 10 });
 
       // 状态指示器
       Row() {
@@ -212,7 +216,8 @@ export struct CalcPage {
     }
     .width('100%')
     .height('100%')
-    .padding(16)
+    // 底部手势条避让（日志面板为最后一个元素）
+    .padding({ left: 16, right: 16, top: 16, bottom: this.safeBottom })
     .backgroundColor(Color.Transparent);
       }
     }
@@ -245,16 +250,19 @@ struct ControlPanel {
           .fontColor($r('sys.color.font_primary'))
           .margin({ right: 12 });
 
-        Button('-')
-          .width(40)
-          .height(40)
-          .fontSize(18)
-          .opacity(this.isRunning ? 0.5 : 1)
-          .onClick(() => {
-            if (!this.isRunning && this.workerCount > 1) {
+        GlassButton({
+          label: '-',
+          btnHeight: 40,
+          fontSize: 18,
+          isEnabled: !this.isRunning,
+          fillWidth: true,
+          onAction: () => {
+            if (this.workerCount > 1) {
               this.onWorkerCountChange(this.workerCount - 1);
             }
-          });
+          }
+        })
+          .width(40)
 
         Text(this.workerCount.toString())
           .fontSize(18)
@@ -262,16 +270,19 @@ struct ControlPanel {
           .width(60)
           .textAlign(TextAlign.Center);
 
-        Button('+')
-          .width(40)
-          .height(40)
-          .fontSize(18)
-          .opacity(this.isRunning ? 0.5 : 1)
-          .onClick(() => {
-            if (!this.isRunning && this.workerCount < MAX_WK_CNT) {
+        GlassButton({
+          label: '+',
+          btnHeight: 40,
+          fontSize: 18,
+          isEnabled: !this.isRunning,
+          fillWidth: true,
+          onAction: () => {
+            if (this.workerCount < MAX_WK_CNT) {
               this.onWorkerCountChange(this.workerCount + 1);
             }
-          });
+          }
+        })
+          .width(40)
       }
       .margin({ bottom: 16 });
 
@@ -288,16 +299,19 @@ struct ControlPanel {
         }
 
 
-        Button('-')
-          .width(40)
-          .height(40)
-          .fontSize(18)
-          .opacity(this.isRunning ? 0.5 : 1)
-          .onClick(() => {
-            if (!this.isRunning && this.maxCalcCount > 10) {
+        GlassButton({
+          label: '-',
+          btnHeight: 40,
+          fontSize: 18,
+          isEnabled: !this.isRunning,
+          fillWidth: true,
+          onAction: () => {
+            if (this.maxCalcCount > 10) {
               this.onCalcMaxCountChange(this.maxCalcCount - 10);
             }
-          });
+          }
+        })
+          .width(40)
 
         Text(this.maxCalcCount.toString())
           .fontSize(18)
@@ -305,34 +319,42 @@ struct ControlPanel {
           .width(60)
           .textAlign(TextAlign.Center);
 
-        Button('+')
-          .width(40)
-          .height(40)
-          .fontSize(18)
-          .opacity(this.isRunning ? 0.5 : 1)
-          .onClick(() => {
-            if (!this.isRunning && this.maxCalcCount < MAX_CALC_CNT) {
+        GlassButton({
+          label: '+',
+          btnHeight: 40,
+          fontSize: 18,
+          isEnabled: !this.isRunning,
+          fillWidth: true,
+          onAction: () => {
+            if (this.maxCalcCount < MAX_CALC_CNT) {
               this.onCalcMaxCountChange(this.maxCalcCount + 10);
             }
-          });
+          }
+        })
+          .width(40)
       }
       .margin({ bottom: 16 });
 
       // 控制按钮
       Row() {
-        Button(this.isRunning ? '停止负载' : '启动负载')
-          .width(140)
-          .height(45)
-          .fontSize(18)
-          .fontColor(Color.White)
-          .backgroundColor(this.isRunning ? '#FF6B6B' : '#4CAF50')
-          .onClick(() => {
+        GlassButton({
+          label: this.isRunning ? '停止负载' : '启动负载',
+          fillWidth: true,
+          bgColor: this.isRunning ? '#FF6B6B' : '#4CAF50',
+          textColor: Color.White,
+          strokeWidth: 0,
+          btnHeight: 45,
+          fontSize: 18,
+          fontWeight: FontWeight.Medium,
+          onAction: () => {
             if (this.isRunning) {
               this.onStop();
             } else {
               this.onStart();
             }
-          });
+          }
+        })
+          .width(140)
       }
     }
     .width('100%')
@@ -349,9 +371,9 @@ struct ControlPanel {
 }
 
 // 日志面板组件
-@Component
+@ComponentV2
 struct LogPanel {
-  @Prop logs: string[] = [];
+  @Param logs: string[] = [];
 
   build() {
     Column() {
