@@ -911,18 +911,22 @@ main/src/main/cpp/types/libhdc_z/Index.d.ts
 
 该文件含**仅属于本机**的签名绝对路径与 DevEco 生成的机器绑定加密口令，提交它既无移植价值
 （换机器的绝对路径必然失效），又泄露本机路径与口令串。仓库改为提交
-`build-profile.template.json5`（占位符 + 注释）：
+`build-profile.template.json5` + 安装脚本 `tools/setup_signing.ps1`：
 
-```bash
-# 方式一：用 DevEco Studio 打开工程，在 Signing Configs 勾选自动签名，IDE 会生成本地文件
-# 方式二：复制模板并填入本机路径与口令
-copy build-profile.template.json5 build-profile.json5
+```powershell
+pwsh -File tools/setup_signing.ps1                        # 从模板生成，再按提示填/让 IDE 生成
+pwsh -File tools/setup_signing.ps1 -From <路径> -Force     # 从已有配置或备份恢复（换机迁移）
 ```
+
+> **为什么不做成"外部文件 + include"**：hvigor 的 `build-profile.json5` 不支持 include/引用，
+> 签名物料必须内联在 `signingConfigs[].material` 里。所谓"单独一份不追踪的文件"就是这个
+> 文件本身——本机放一份即可编译，脚本负责把它装上并校验是否还是模板。
 
 | 文件 | 状态 | 说明 |
 |---|---|---|
-| `build-profile.json5` | 本机、忽略 | 实际参与构建的 profile |
-| `build-profile.template.json5` | 提交 | 结构模板与填写说明 |
+| `build-profile.json5` | 本机、忽略 | 实际参与构建的 profile（含本机路径与口令） |
+| `build-profile.template.json5` | 提交 | 结构模板 + 填写说明 |
+| `tools/setup_signing.ps1` | 提交 | 安装/恢复/校验本机 profile |
 | `oh-package-lock.json5` | **提交** | 锁定依赖解析结果，避免 caret 范围漂移 |
 
 > `sign/` 同样被忽略，内含 release 签名材料与 hvigor 的**签名材料解密缓存** `sign/material/`——

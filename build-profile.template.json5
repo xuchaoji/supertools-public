@@ -2,12 +2,17 @@
   // 本文件是 build-profile.json5 的模板。真正的 build-profile.json5 已被 .gitignore 忽略，
   // 因为它包含仅属于本机的签名绝对路径与（机器绑定的加密）口令，不应提交。
   //
-  // 使用方式：
+  // 使用方式（最省事的是脚本）：
+  //   pwsh -File tools/setup_signing.ps1                 # 从本模板生成 build-profile.json5
+  //   pwsh -File tools/setup_signing.ps1 -From <路径> -Force   # 从已有配置/备份恢复
+  // 或手工：
   //   1. 用 DevEco Studio 打开工程并在「Project Structure > Signing Configs」里勾选自动签名，
   //      DevEco 会自动生成本地的 build-profile.json5；或
   //   2. 复制本文件为 build-profile.json5，再把下面 <> 占位符替换为本机实际路径与口令。
   //
   // 备注：
+  //   - hvigor 不支持在 build-profile.json5 里 include 外部文件，签名物料必须内联在这里，
+  //     所以「本机配置」就是这个文件本身，放到仓库根目录即可编译。
   //   - 签名口令是 DevEco 生成的机器绑定加密串，换机器必须重新签名，不能直接拷贝。
   //   - 仓库内 sign/ 目录同样被忽略；它保存 release 签名材料与本机解密缓存（sign/material）。
   //   - build-profile-pad-release.json5 之类按设备形态区分的 profile 也是本机文件，不提交。

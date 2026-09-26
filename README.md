@@ -2,13 +2,19 @@ target选择dev，登录账号签名并申请ACL权限，可以使用部分依�
 
 ## 首次拉取后如何构建
 
-`build-profile.json5` **不在版本控制内**（含本机签名绝对路径与机器绑定口令），需要本地生成：
+`build-profile.json5` **不在版本控制内**（含本机签名绝对路径与 DevEco 生成的机器绑定加密口令），
+所以每个机器上都要放一份本机的：
 
-```bash
-# 方式一：用 DevEco Studio 打开工程，Project Structure → Signing Configs 勾选自动签名
-# 方式二：复制模板后填入本机签名路径与口令
-copy build-profile.template.json5 build-profile.json5
+```powershell
+# 从模板生成（之后按提示填占位符，或用 DevEco 的 Signing Configs 自动生成）
+pwsh -File tools/setup_signing.ps1
+
+# 或从已有配置 / 备份直接恢复（换机迁移最省事）
+pwsh -File tools/setup_signing.ps1 -From D:\backup\build-profile.json5 -Force
 ```
+
+> hvigor 不支持在 `build-profile.json5` 里 include 外部文件，签名物料必须内联，
+> 因此「本机签名配置」就是这个文件本身——放到仓库根目录即可编译。
 
 构建脚本依赖 `DEVECO_HOME`（首次执行一次 `setx DEVECO_HOME "C:\Program Files\Huawei\DevEco Studio"`）：
 
