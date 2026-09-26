@@ -3,12 +3,9 @@ import { BusinessError } from '@kit.BasicServicesKit';
 import { fileIo as fs } from '@kit.CoreFileKit';
 import { wifiManager } from '@kit.ConnectivityKit';
 import { util } from '@kit.ArkTS';
-import { PreferencesUtil } from '@pura/harmony-utils';
-import { SpKeys } from '../constant/SpKeys';
 
 const HEADER_LIMIT_BYTES: number = 16 * 1024;
 const DEFAULT_MAX_TRANSFER_BYTES: number = 200 * 1024 * 1024;
-const TOKEN_MIN_LENGTH: number = 16;
 /** 通用 POST 回显缓冲上限：超出部分不保留，避免无界增长。 */
 const ECHO_LIMIT_BYTES: number = 1024 * 1024;
 /** 单次发送的分片大小，下载时用于把峰值内存压到 O(64KB)。 */
@@ -60,7 +57,6 @@ export class WebServerUtil {
   private _isRunning: boolean = false;
   private encoder = new util.TextEncoder();
   private maxTransferBytes: number = DEFAULT_MAX_TRANSFER_BYTES;
-  private accessToken: string = '';
 
   private rateLimits: Map<string, number> = new Map();
   private lastAccessTimes: Map<string, number> = new Map();
@@ -76,10 +72,6 @@ export class WebServerUtil {
     return this._isRunning;
   }
 
-  public get token(): string {
-    return this.accessToken;
-  }
-
   public get maxTransferMb(): number {
     return Math.floor(this.maxTransferBytes / 1024 / 1024);
   }
@@ -89,51 +81,17 @@ export class WebServerUtil {
     this.maxTransferBytes = safeMb * 1024 * 1024;
   }
 
+  /** 局域网访问地址。本机调试工具，不做访问鉴权，直接用这个地址即可。 */
   public getAccessUrl(): string {
-    return `http://${this.getIpAddress()}:${this.port}/?token=${encodeURIComponent(this.accessToken)}`;
+    return `http://${this.getIpAddress()}:${this.port}/`;
   }
 
   public init(baseDir: string, port: number = 8088): void {
     this.rootDir = this.normalizeRoot(baseDir);
     this.port = port;
-    if (!this.accessToken) {
-      this.restoreOrCreateToken();
-    }
     console.info(`[WebServer] Init RootDir: ${this.rootDir}, Port: ${this.port}`);
     this.ensureRootExist();
     AppStorage.setOrCreate('RecentAccessFile', 'Web运行中');
-  }
-
-  /**
-   * 读取持久化令牌，缺失时生成并写回。
-   * 令牌在 init() 内即可用，因此 MainAbility/PrivacyPage 在用户打开页面之前
-   * 自动启动 Web 服务时也已经是鉴权状态，不存在无鉴权窗口。
-   */
-  public restoreOrCreateToken(): string {
-    try {
-      const stored: string = PreferencesUtil.getStringSync(SpKeys.WEB_SERVER_TOKEN, '');
-      if (stored && stored.length >= TOKEN_MIN_LENGTH) {
-        this.accessToken = stored;
-        return stored;
-      }
-    } catch (e) {
-      console.error(`[WebServer] 读取访问令牌失败: ${JSON.stringify(e)}`);
-    }
-    this.accessToken = this.createAccessToken();
-    try {
-      PreferencesUtil.put(SpKeys.WEB_SERVER_TOKEN, this.accessToken);
-    } catch (e) {
-      console.error(`[WebServer] 持久化访问令牌失败: ${JSON.stringify(e)}`);
-    }
-    return this.accessToken;
-  }
-
-  private createAccessToken(): string {
-    let token: string = Date.now().toString(36);
-    for (let i = 0; i < 6; i++) {
-      token += Math.floor(Math.random() * 0x100000000).toString(36);
-    }
-    return token;
   }
 
   public setRateLimit(filePath: string, minutes: number): void {
@@ -275,10 +233,6 @@ export class WebServerUtil {
       }
       state.meta = parsed.meta;
       state.headerChunks = [];
-      if (!this.isAuthorized(state.meta.path, state.meta.headers)) {
-        this.failConnection(clientSocket, state, 401, 'Unauthorized');
-        return;
-      }
       if (state.meta.contentLength > this.maxTransferBytes) {
         this.failConnection(clientSocket, state, 413, 'Payload Too Large');
         return;
@@ -462,33 +416,6 @@ export class WebServerUtil {
     return { meta: meta, errorCode: 0, errorMessage: '' };
   }
 
-  private isAuthorized(path: string, headers: Record<string, string>): boolean {
-    const headerToken: string = headers['x-access-token'] || '';
-    const queryToken: string = this.getQueryParam(path, 'token');
-    return headerToken === this.accessToken || queryToken === this.accessToken;
-  }
-
-  private getQueryParam(path: string, key: string): string {
-    const queryIndex: number = path.indexOf('?');
-    if (queryIndex < 0) {
-      return '';
-    }
-    const pairs: string[] = path.substring(queryIndex + 1).split('&');
-    for (const pair of pairs) {
-      const separator: number = pair.indexOf('=');
-      const rawKey: string = separator >= 0 ? pair.substring(0, separator) : pair;
-      if (rawKey === key) {
-        const value: string = separator >= 0 ? pair.substring(separator + 1) : '';
-        try {
-          return decodeURIComponent(value);
-        } catch (e) {
-          return '';
-        }
-      }
-    }
-    return '';
-  }
-
   /**
    * 逐段解码后再校验，是同时封堵 `%2e%2e%2f`（编码穿越）与 `%2F`（伪造分隔符）
    * 的唯一形式：旧实现先查 `..` 再解码，可被编码变形绕过。
@@ -616,10 +543,6 @@ export class WebServerUtil {
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  private tokenizedUrl(path: string): string {
-    return path + (path.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(this.accessToken);
-  }
-
   private handleDirectoryListing(clientSocket: socket.TCPSocketConnection, urlPath: string, fsPath: string): void {
     try {
       const files: string[] = fs.listFileSync(fsPath);
@@ -628,7 +551,7 @@ export class WebServerUtil {
 <div class="card"><h2>Index of ${this.escapeHtml(urlPath)}</h2><div class="upload-zone" id="drop-zone"><p>拖拽文件或文件夹到此处上传（单文件上限 ${this.maxTransferMb} MB）</p><input type="file" id="file-input" multiple><input type="file" id="folder-input" webkitdirectory multiple><div id="progress"></div></div></div><div class="card">`;
       if (urlPath !== '/' && urlPath !== '') {
         const parent: string = urlPath.substring(0, urlPath.lastIndexOf('/')) || '/';
-        html += `<a href="${this.tokenizedUrl(parent)}">⬆️ .. (Parent)</a>`;
+        html += `<a href="${parent}">⬆️ .. (Parent)</a>`;
       }
       files.forEach((file: string) => {
         const fullPath: string = fsPath + (fsPath.endsWith('/') ? '' : '/') + file;
@@ -637,12 +560,12 @@ export class WebServerUtil {
           isDir = fs.statSync(fullPath).isDirectory();
         } catch (e) {}
         const href: string = (urlPath.endsWith('/') ? urlPath : urlPath + '/') + encodeURIComponent(file);
-        html += `<a href="${this.tokenizedUrl(href)}">${isDir ? '📂' : '📄'} ${this.escapeHtml(file)}</a>`;
+        html += `<a href="${href}">${isDir ? '📂' : '📄'} ${this.escapeHtml(file)}</a>`;
       });
       html += `</div><script>
-const token=${JSON.stringify(this.accessToken)};const currentPath=location.pathname.endsWith('/')?location.pathname:location.pathname+'/';const progress=document.getElementById('progress');
-async function uploadFile(file,targetPath){if(file.size>${this.maxTransferBytes}){throw new Error('文件超过 ${this.maxTransferMb} MB');}const buffer=await file.arrayBuffer();const r=await fetch('/api/upload?token='+encodeURIComponent(token),{method:'POST',headers:{'X-Access-Token':token,'X-File-Path':encodeURIComponent(targetPath),'Content-Type':'application/octet-stream'},body:buffer});if(!r.ok)throw new Error(await r.text());}
-async function handle(files){for(let i=0;i<files.length;i++){const f=files[i];const p=f.webkitRelativePath||f.name;progress.innerText='上传中 '+(i+1)+'/'+files.length;await uploadFile(f,currentPath+p);}location.href=location.pathname+'?token='+encodeURIComponent(token);}
+const currentPath=location.pathname.endsWith('/')?location.pathname:location.pathname+'/';const progress=document.getElementById('progress');
+async function uploadFile(file,targetPath){if(file.size>${this.maxTransferBytes}){throw new Error('文件超过 ${this.maxTransferMb} MB');}const buffer=await file.arrayBuffer();const r=await fetch('/api/upload',{method:'POST',headers:{'X-File-Path':encodeURIComponent(targetPath),'Content-Type':'application/octet-stream'},body:buffer});if(!r.ok)throw new Error(await r.text());}
+async function handle(files){for(let i=0;i<files.length;i++){const f=files[i];const p=f.webkitRelativePath||f.name;progress.innerText='上传中 '+(i+1)+'/'+files.length;await uploadFile(f,currentPath+p);}location.reload();}
 document.getElementById('file-input').onchange=e=>handle(Array.from(e.target.files)).catch(e=>progress.innerText=e.message);document.getElementById('folder-input').onchange=e=>handle(Array.from(e.target.files)).catch(e=>progress.innerText=e.message);
 const dz=document.getElementById('drop-zone');dz.ondragover=e=>e.preventDefault();dz.ondrop=e=>{e.preventDefault();handle(Array.from(e.dataTransfer.files)).catch(e=>progress.innerText=e.message);};
 </script></body></html>`;

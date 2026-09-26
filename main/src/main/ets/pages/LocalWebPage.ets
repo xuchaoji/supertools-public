@@ -458,8 +458,7 @@ export struct LocalWebPage {
       relative = relative.substring(1);
     }
     let path = relative ? `${relative}/${item.name}` : item.name;
-    const token: string = encodeURIComponent(WebServerUtil.getInstance().token);
-    this.viewModel.previewUrl = `http://127.0.0.1:${this.viewModel.serverPort}/${path}?token=${token}`;
+    this.viewModel.previewUrl = `http://127.0.0.1:${this.viewModel.serverPort}/${path}`;
     this.viewModel.isPreviewing = true;
   }
 
@@ -591,7 +590,7 @@ export struct LocalWebPage {
                 let data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN,
                   WebServerUtil.getInstance().getAccessUrl());
                 pasteboard.getSystemPasteboard().setData(data);
-                promptAction.showToast({ message: '带访问令牌的地址已复制' });
+                promptAction.showToast({ message: '访问地址已复制' });
               })
             Text(`单次传输上限 ${this.viewModel.maxTransferMb} MB（点击设置）`)
               .fontSize(12)

@@ -198,14 +198,21 @@ if ($Device) {
         Test-Assert 'Web 服务已启动' ($logs -match 'Server Started on port') $logs
         Test-Assert '后台长时任务已申请' ($logs -match '后台任务启动成功|BackgroundService') $logs
 
-        # 无 token 访问必须被拒绝，证明鉴权生效（带 token 的链接在应用页面内可复制）
+        # 本机调试工具不做鉴权：裸地址应可直接访问；路径穿越必须仍被拦截
         $ip = $Device.Split(':')[0]
         try {
             $r = Invoke-WebRequest -UseBasicParsing -Uri "http://${ip}:8088/" -TimeoutSec 8
-            Test-Assert '无 token 访问被拒绝' ($r.StatusCode -eq 401) "HTTP $($r.StatusCode)"
+            Test-Assert '裸地址可直接访问（无鉴权）' ($r.StatusCode -eq 200) "HTTP $($r.StatusCode)"
         } catch {
             $code = $_.Exception.Response.StatusCode.value__
-            Test-Assert '无 token 访问被拒绝' ($code -eq 401) "HTTP $code"
+            Test-Assert '裸地址可直接访问（无鉴权）' $false "HTTP $code"
+        }
+        try {
+            $r2 = Invoke-WebRequest -UseBasicParsing -Uri "http://${ip}:8088/%2e%2e%2fetc/passwd" -TimeoutSec 8
+            Test-Assert '路径穿越被拦截' $false "HTTP $($r2.StatusCode)"
+        } catch {
+            $code2 = $_.Exception.Response.StatusCode.value__
+            Test-Assert '路径穿越被拦截' ($code2 -eq 403) "HTTP $code2"
         }
     }
 }

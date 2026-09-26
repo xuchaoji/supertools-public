@@ -656,12 +656,12 @@ private static transitionQueue: Promise<void>;
 import { WebServerUtil } from '../utils/WebServerUtil';
 
 const server = WebServerUtil.getInstance();
-server.init(filesDir + '/wwwroot', 8088);   // 根目录 + 端口（会顺带恢复/生成访问令牌）
+server.init(filesDir + '/wwwroot', 8088);   // 根目录 + 端口
 server.start();          // 启动 TCP Socket Server 监听
 server.stop();           // 关闭
 server.getIpAddress();   // WiFi IP (wifiManager.getIpInfo())
-server.getAccessUrl();   // 带 token 的局域网访问地址（页面展示/复制用）
-server.token;            // 当前访问令牌
+server.getAccessUrl();   // 局域网访问地址，如 http://192.168.3.144:8088/（页面展示/复制用）
+server.getAccessUrl(); // 局域网访问地址，如 http://192.168.3.144:8088/
 server.isRunning;        // 运行状态
 
 // 单次上传/下载上限（MB），默认 200；页面「单次传输上限」菜单可改并持久化
@@ -673,15 +673,19 @@ server.setRateLimit('/path/file', 1);        // 限制 1 分钟 1 次
 server.getRateLimitMinutes('/path/file');
 ```
 
-**访问鉴权（默认开启）**：
+**访问控制：不做鉴权（有意为之）**
 
-- 启动时从 `SpKeys.WEB_SERVER_TOKEN` 读取令牌，缺失则生成并写回（`restoreOrCreateToken()`）。
-  令牌在 `init()` 内即就绪，因此 `MainAbility` / `PrivacyPage` 在用户打开页面前自动启动 Web 服务时
-  **不存在无鉴权窗口**。
-- 校验通道：请求头 `X-Access-Token`，或查询参数 `?token=`（应用内预览、目录列表链接都用后者）。
-- 未通过 → `401`。刷新令牌后旧的局域网链接立刻失效。
-- 明文 HTTP 无 TLS：token 防的是同网段误访问与跨站读取，**不防抓包**。
-- 已移除 `Access-Control-Allow-Origin: *`（否则任意网页可跨站读取整个 wwwroot）。
+- 这是**本机/局域网调试工具**，目标是"打开浏览器就能看文件列表"，因此**不引入令牌登录**：
+  `http://<设备IP>:8088/` 直接可访问，不需要 `?token=` 之类的参数。
+- 曾短暂加过令牌鉴权（生成持久化 token、无 token 返回 401），因为影响日常使用体验已**整体移除**：
+  `WebServerUtil` 不再有 `accessToken` / `restoreOrCreateToken` / `isAuthorized`，
+  `SpKeys.WEB_SERVER_TOKEN` 也已删除。如果将来真需要，可从 git 历史取回。
+- 保留的与"体验"无关的防护（这些是修 bug，不是加戏）：
+  - 路径越界拦截（见 §13.5）；
+  - 请求头 16KB 上限、单次传输上限（默认 200MB）；
+  - 已移除 `Access-Control-Allow-Origin: *`：不加它任何网页都能跨站读你的 wwwroot，
+    去掉后本机浏览器直接访问不受影响。
+- 明文 HTTP 无 TLS：同网段任何人都能访问，**这是这个工具的既定取舍**（别把它暴露到不可信网络）。
 
 **请求处理（流式，内存与文件大小解耦）**：
 
@@ -700,7 +704,7 @@ server.getRateLimitMinutes('/path/file');
 | 码 | 触发条件 |
 |---|---|
 | `400` | `Content-Length` 非十进制（旧实现解析成 `NaN` 会让同一请求被反复响应） |
-| `401` | 缺少/错误的 token |
+| ~~`401`~~ | 已移除令牌鉴权，不再出现 |
 | `403` | 路径越界（见 §13.5） |
 | `404` | 文件/目录不存在 |
 | `405` | 非 GET/POST |
@@ -717,7 +721,7 @@ server.getRateLimitMinutes('/path/file');
 - 响应统一带 `X-Content-Type-Options: nosniff` + `Cache-Control: no-store` + `Connection: close`
 - 文件频控限速 (path → lastAccess 检查，超限返回 429)
 - `AppStorage.setOrCreate('RecentAccessFile', fileName)` 推送最近访问（悬浮球依赖此键）
-- 页面内 `openPreview()` 用 `http://127.0.0.1:<port>/<path>?token=<token>`，预览同样带令牌
+- 页面内 `openPreview()` 用 `http://127.0.0.1:<port>/<path>` 直接预览
 
 
 ### 6.10 共享偏好与上下文
@@ -1019,7 +1023,7 @@ pwsh -File tools/verify_build.ps1
 # 追加：从零构建（先清 build/.cxx）+ 上架 .app 打包
 pwsh -File tools/verify_build.ps1 -Clean -IncludeApp
 
-# 追加真机冒烟（安装 dev 包、冷启动、长时任务日志、Web 鉴权）
+# 追加真机冒烟（安装 dev 包、冷启动、长时任务日志、Web 访问）
 pwsh -File tools/verify_build.ps1 -Device 192.168.3.144:12345
 
 # 只跑检查、不重新编译
@@ -1042,7 +1046,7 @@ pwsh -File tools/verify_build.ps1 -SkipBuild -Device 192.168.3.144:12345
 | 环境 | `DEVECO_HOME`、`hvigorw`、本地 profile 存在、lockfile 已提交、profile 未被跟踪 |
 | 哈希 | release 原生构建**不含** `TEST_HASH`；`hdc_hash_gen.h` 已生成且为 32 位十六进制；dev 按预期含 `TEST_HASH` |
 | 产物 | 三个 HAP 均存在、**不含** `libhdc_napi.so`（已删除的 Rust 实现）、含 `libhdc_z.so` |
-| 真机 | 安装成功、进程存活、冷启动无 `9800005`、Web 服务已启动、长时任务已申请、无 token → 401 |
+| 真机 | 安装成功、进程存活、冷启动无 `9800005`、Web 服务已启动、长时任务已申请、裸地址可访问（200） |
 
 > **锁屏设备无法用命令拉起应用**：`aa start` 会返回
 > `10106102 The device screen is locked during the application launch`（开发者模式下不会自动解锁）。
@@ -1298,7 +1302,7 @@ $r('app.string.setting_tab')
 
 | 关注点 | 约定 |
 |---|---|
-| 鉴权 | 默认启用随机 token；无 token → 401；**不要**恢复 `Access-Control-Allow-Origin: *` |
+| 访问控制 | **不做鉴权**（本机调试工具有意为之）；**不要**恢复 `Access-Control-Allow-Origin: *` |
 | 路径 | 一律经 `resolveSafePath()`；先解码后校验必错 |
 | 输出 | 目录列表/文件名必须转义 |
 | 上限 | header 16KB、单请求/单文件上限可配置（默认 200MB）；新增读文件路径必须复用同一上限 |
@@ -1475,8 +1479,7 @@ export class SpKeys {
   也不能整串解码后再查（`%2F` 会变成真实分隔符），逐段解码是唯一同时封堵两条路径的形式。
 - 所有入口（GET / 通用 POST / `/api/upload` 的 `X-File-Path`）都必须经过它；历史上通用 POST 漏检 = 任意文件读。
 - 目录列表输出必须 `escapeHtml()`，否则恶意文件名（HarmonyOS 允许 `<`）构成存储型 XSS。
-- 局域网访问默认需要 token（`X-Access-Token` 或 `?token=`），未通过返回 401；
-  页面展示与复制的都是带 token 的 `getAccessUrl()`。
+- 局域网访问**不需要令牌**（本机调试工具，有意不做鉴权）。
 - 单次上传/下载上限默认 200MB（`setMaxTransferMb`），超限 413；header 上限 16KB（431）。
 - 所有文件路径操作需处理 `file://` 前缀的添加/剥离。
 
