@@ -731,18 +731,15 @@ export struct LocalWebPage {
               item.isDir ? this.enterFolder(item) : this.openPreview(item)
             })
 
-            GlassButton({
-              label: "⚙️",
-              fillWidth: true,
-              bgColor: Color.Transparent,
-              strokeWidth: 0,
-              blurRadius: 0,
-              btnHeight: 40,
-              fontSize: 22,
-              onAction: () => {
-              }
-            })
+            // bindMenu 需要直接挂在原生可点击节点上；GlassButton 内部会消费点击事件，
+            // 导致绑定在自定义组件外层的菜单无法弹出。
+            Button("⚙️")
+              .type(ButtonType.Normal)
+              .fontSize(22)
+              .backgroundColor(Color.Transparent)
+              .padding(0)
               .width(40)
+              .height(40)
               .bindMenu(this.getMenuItems(item))
           }
           // 光感文件行：通透玻璃 + 边缘折射（非磨砂），壁纸透出
