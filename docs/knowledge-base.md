@@ -1103,26 +1103,27 @@ main/src/main/cpp/types/libhdc_z/Index.d.ts
 > 发布签名只在「打上架包」时用，平时不要碰。旧文件 `build-profile-pad-release.json5` 已废弃，
 > 其内容已并入本文件 `release` 签名/产品。
 
-**`build-profile.json5` 不纳入版本控制**（`.gitignore` 已忽略）：
+**`build-profile.json5` 的版本控制与签名隔离**：
 
-该文件含**仅属于本机**的签名绝对路径与 DevEco 生成的机器绑定加密口令，提交它既无移植价值
-（换机器的绝对路径必然失效），又泄露本机路径与口令串。仓库改为提交
-`build-profile.template.json5` + 安装脚本 `tools/setup_signing.ps1`：
+该文件定义了全局产品的骨架（`products`、`modules`、`targets`），因此**基础架构纳入版本控制**，确保新电脑 clone 后能立即被 DevEco Studio 识别为标准鸿蒙工程并正常 Sync。
 
-```powershell
-pwsh -File tools/setup_signing.ps1                        # 从模板生成，再按提示填/让 IDE 生成
-pwsh -File tools/setup_signing.ps1 -From <路径> -Force     # 从已有配置或备份恢复（换机迁移）
+为了防止本机生成的私有签名路径（`C:\Users\...`）和加密口令被提交至远程，采用 `git update-index --skip-worktree` 隔离机制：
+
+```bash
+# 首次拉取后执行一次（告诉 Git 忽略本地对该文件的后续修改）：
+git update-index --skip-worktree build-profile.json5
+
+# 或运行跨平台配置脚本：
+node tools/setup_signing.js
+# 或 pwsh -File tools/setup_signing.ps1
 ```
-
-> **为什么不做成"外部文件 + include"**：hvigor 的 `build-profile.json5` 不支持 include/引用，
-> 签名物料必须内联在 `signingConfigs[].material` 里。所谓"单独一份不追踪的文件"就是这个
-> 文件本身——本机放一份即可编译，脚本负责把它装上并校验是否还是模板。
 
 | 文件 | 状态 | 说明 |
 |---|---|---|
-| `build-profile.json5` | 本机、忽略 | 实际参与构建的 profile（含本机路径与口令） |
-| `build-profile.template.json5` | 提交 | 结构模板 + 填写说明 |
-| `tools/setup_signing.ps1` | 提交 | 安装/恢复/校验本机 profile |
+| `build-profile.json5` | **提交（开箱即用骨架）** | 定义工程产品/模块/target，本地修改通过 skip-worktree 保护 |
+| `build-profile.local.json5` | 本机、忽略 | 本机备份 profile（含本机私有路径与口令） |
+| `build-profile.template.json5` | 提交 | 备用结构模板 + 填写说明 |
+| `tools/setup_signing.js` / `.ps1` | 提交 | 跨平台本地签名保护与备份恢复工具 |
 | `oh-package-lock.json5` | **提交** | 锁定依赖解析结果，避免 caret 范围漂移 |
 
 > `sign/` 同样被忽略，内含 release 签名材料与 hvigor 的**签名材料解密缓存** `sign/material/`——

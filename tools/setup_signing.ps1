@@ -30,24 +30,43 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $repoRoot
 
 $target = Join-Path $repoRoot 'build-profile.json5'
+$localBackup = Join-Path $repoRoot 'build-profile.local.json5'
 $template = Join-Path $repoRoot 'build-profile.template.json5'
 
-if ((Test-Path $target) -and -not $Force) {
-    $text = Get-Content $target -Raw
-    if ($text -match '<HOME>|<project>|DevEco 生成的加密口令') {
-        Write-Host '[WARN] build-profile.json5 已存在，但仍含模板占位符，无法签名。' -ForegroundColor Yellow
-        Write-Host '       请填写真实路径与口令，或用 DevEco Studio 的 Signing Configs 生成后重试。'
-        Write-Host '       （如需用其他文件覆盖：加 -Force，或 -From <路径> -Force）'
-        exit 1
+# 保护机制：自动设置 skip-worktree，防止本地签名污染 Git
+function Protect-Profile {
+    try {
+        git update-index --skip-worktree build-profile.json5 2>$null
+        Write-Host '[ OK ] 已设置 git skip-worktree，本地签名不会被 Git 提交。' -ForegroundColor Green
+    } catch {
+        # ignore git error
     }
-    Write-Host '[ OK ] build-profile.json5 已存在且不像是模板，无需处理。' -ForegroundColor Green
-    exit 0
 }
 
 if ($From) {
     if (-not (Test-Path $From)) { throw "找不到来源文件: $From" }
     Copy-Item $From $target -Force
+    Protect-Profile
     Write-Host "[ OK ] 已从 $From 安装本机签名配置" -ForegroundColor Green
+    exit 0
+}
+
+if ((Test-Path $localBackup) -and (-not (Test-Path $target) -or $Force)) {
+    Copy-Item $localBackup $target -Force
+    Protect-Profile
+    Write-Host "[ OK ] 已从本地备份 $localBackup 恢复签名配置" -ForegroundColor Green
+    exit 0
+}
+
+if ((Test-Path $target) -and -not $Force) {
+    Protect-Profile
+    $text = Get-Content $target -Raw
+    if ($text -match '<HOME>|<project>|DevEco 生成的加密口令') {
+        Write-Host '[WARN] build-profile.json5 仍含模板占位符，无法签名。' -ForegroundColor Yellow
+        Write-Host '       请用 DevEco Studio 的 Signing Configs 勾选自动签名后重试。'
+        exit 1
+    }
+    Write-Host '[ OK ] build-profile.json5 已就绪，无需处理。' -ForegroundColor Green
     exit 0
 }
 

@@ -37,18 +37,22 @@ function removePermissionPlugin(): HvigorPlugin {
                   }
                   found = true;
 
-                  const fileContent = fs.readFileSync(candidate, 'utf-8');
-                  const moduleJson = JSON.parse(fileContent);
+                  try {
+                    const fileContent = fs.readFileSync(candidate, 'utf-8');
+                    const moduleJson = JSON.parse(fileContent);
 
-                  if (moduleJson.module && moduleJson.module.requestPermissions && moduleJson.module.requestPermissions.length > 0) {
-                    const originalCount = moduleJson.module.requestPermissions.length;
-                    moduleJson.module.requestPermissions = moduleJson.module.requestPermissions.filter(
-                      (perm: any) => !permissionsToRemove.includes(perm.name)
-                    );
-                    const removed = originalCount - moduleJson.module.requestPermissions.length;
+                    if (moduleJson.module && moduleJson.module.requestPermissions && moduleJson.module.requestPermissions.length > 0) {
+                      const originalCount = moduleJson.module.requestPermissions.length;
+                      moduleJson.module.requestPermissions = moduleJson.module.requestPermissions.filter(
+                        (perm: any) => !permissionsToRemove.includes(perm.name)
+                      );
+                      const removed = originalCount - moduleJson.module.requestPermissions.length;
 
-                    fs.writeFileSync(candidate, JSON.stringify(moduleJson, null, 2));
-                    console.log(`\n[CustomPlugin] ✂️ 从 ${candidate} 中移除了 ${removed} 个权限（${permissionsToRemove.join(', ')}）\n`);
+                      fs.writeFileSync(candidate, JSON.stringify(moduleJson, null, 2));
+                      console.log(`\n[CustomPlugin] ✂️ 从 ${candidate} 中移除了 ${removed} 个权限（${permissionsToRemove.join(', ')}）\n`);
+                    }
+                  } catch (err) {
+                    console.warn(`\n[CustomPlugin] ⚠️ 处理 ${candidate} 时发生异常:`, err);
                   }
                 }
               }

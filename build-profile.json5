@@ -1,0 +1,79 @@
+{
+  "app": {
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools",
+        "label": "$string:app_name",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "dev",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools.dev",
+        "label": "$string:app_name_dev",
+        "icon": "$media:layered_icon_dev",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      },
+      {
+        "name": "release",
+        "targetSdkVersion": "5.0.5(17)",
+        "compatibleSdkVersion": "5.0.5(17)",
+        "runtimeOS": "HarmonyOS",
+        "bundleName": "com.xuchaoji.hmos.supertools",
+        "label": "$string:app_name",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "main",
+      "srcPath": "./main",
+      "targets": [
+        {
+          "name": "product",
+          "applyToProducts": [
+            "default",
+            "release"
+          ]
+        },
+        {
+          "name": "dev",
+          "applyToProducts": [
+            "dev"
+          ]
+        }
+      ]
+    }
+  ]
+}
