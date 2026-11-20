@@ -894,120 +894,139 @@ export struct HomePage {
   }
 
   /**
-   * 官方沉浸光感悬浮栏：Tabs 宽 216vp，只显示底部 TabBar（内容为 0 高）。
-   * `barFloatingStyle.systemMaterial` 是官方明确支持底部页签的材质入口。
+   * 官方沉浸光感悬浮栏：底层 Tabs 只负责官方 systemMaterial 背板；
+   * 上层 overlay 负责「滑动玻璃胶囊 + 图标文字 + 点击」。
+   *
+   * 这样选中态不是两个独立背景的淡入淡出，而是一整块玻璃胶囊
+   * 从左侧入口平滑滑到右侧入口。
    */
   @Builder
   officialBarTabs() {
-    Tabs({
-      barPosition: BarPosition.End,
-      controller: this.barTabsController,
-      index: this.currentIndex
-    }) {
-      TabContent() {
-        Row().width(0).height(0).backgroundColor(Color.Transparent)
-      }
-      .backgroundColor(Color.Transparent)
-      .tabBar(this.officialBarItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings')))
+    Stack() {
+      Tabs({
+        barPosition: BarPosition.End,
+        controller: this.barTabsController
+      }) {
+        TabContent() {
+          Row().width(0).height(0).backgroundColor(Color.Transparent)
+        }
+        .backgroundColor(Color.Transparent)
+        .tabBar(this.emptyTabBar())
 
-      TabContent() {
-        Row().width(0).height(0).backgroundColor(Color.Transparent)
+        TabContent() {
+          Row().width(0).height(0).backgroundColor(Color.Transparent)
+        }
+        .backgroundColor(Color.Transparent)
+        .tabBar(this.emptyTabBar())
       }
+      .width(TAB_BAR_WIDTH)
+      .height(TAB_BAR_AREA_HEIGHT)
+      .barMode(BarMode.Fixed)
+      .barHeight(TAB_BAR_HEIGHT)
+      // 透明化 Tabs 自身背景与 TabBar 背板，否则 216×64 的 Tabs 盒子会在胶囊
+      // 周围露出一块直角白底（右侧/底部看起来像“直角边”）
       .backgroundColor(Color.Transparent)
-      .tabBar(this.officialBarItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting')))
+      .barBackgroundColor(Color.Transparent)
+      .barBackgroundBlurStyle(BlurStyle.NONE)
+      // 悬浮样式要求：横向 + BarPosition.End + barOverlap(true)
+      .barOverlap(true)
+      .barFloatingStyle({
+        barWidth: {
+          smallBarWidth: TAB_BAR_WIDTH,
+          mediumBarWidth: TAB_BAR_WIDTH,
+          largeBarWidth: TAB_BAR_WIDTH
+        },
+        barSideMargin: 0,
+        barBottomMargin: 4,
+        // 关掉官方悬浮栏自带的底部渐变遮罩：它是一块直角矩形，
+        // 会在胶囊周围露出白色/灰色直角边（尤其设置壁纸后非常明显）
+        maskColor: Color.Transparent,
+        maskHeight: 0,
+        adaptToHandedness: false,
+        systemMaterial: LightSense.tabSystemMaterial(this.lightSense)
+      })
+
+      // 与官方 bar 的标签内容区对齐：胶囊 216 宽，左右各 12，两个入口各 96
+      Stack({ alignContent: Alignment.TopStart }) {
+        this.selectedGlassPill(92, 2, 96)
+
+        Row() {
+          this.officialBarItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings'))
+          this.officialBarItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting'))
+        }
+        .width(192)
+        .height(48)
+      }
+      .width(192)
+      .height(48)
+      .position({ x: 12, y: 8 })
     }
     .width(TAB_BAR_WIDTH)
     .height(TAB_BAR_AREA_HEIGHT)
-    .barMode(BarMode.Fixed)
-    .barHeight(TAB_BAR_HEIGHT)
-    // 透明化 Tabs 自身背景与 TabBar 背板，否则 216×64 的 Tabs 盒子会在胶囊
-    // 周围露出一块直角白底（右侧/底部看起来像“直角边”）
-    .backgroundColor(Color.Transparent)
-    .barBackgroundColor(Color.Transparent)
-    .barBackgroundBlurStyle(BlurStyle.NONE)
-    // 悬浮样式要求：横向 + BarPosition.End + barOverlap(true)
-    .barOverlap(true)
-    .barFloatingStyle({
-      barWidth: {
-        smallBarWidth: TAB_BAR_WIDTH,
-        mediumBarWidth: TAB_BAR_WIDTH,
-        largeBarWidth: TAB_BAR_WIDTH
-      },
-      barSideMargin: 0,
-      barBottomMargin: 4,
-      // 关掉官方悬浮栏自带的底部渐变遮罩：它是一块直角矩形，
-      // 会在胶囊周围露出白色/灰色直角边（尤其设置壁纸后非常明显）
-      maskColor: Color.Transparent,
-      maskHeight: 0,
-      adaptToHandedness: false,
-      systemMaterial: LightSense.tabSystemMaterial(this.lightSense)
-    })
     .margin({ left: this.tabBarLeftMargin() })
-    .onChange((index: number) => {
-      if (index !== this.currentIndex) {
-        this.currentIndex = index;
-        this.tabsController.changeIndex(index);
-      }
-    })
   }
 
-  /** 官方栏里的单个入口（点击由 Tabs 自身处理，不再手动挂 onClick） */
+  /**
+   * 滑动选中胶囊：蓝玻璃 + 白 rim + 光晕，位置随 currentIndex 平移。
+   * @param pillWidth 胶囊宽度（官方栏 92，手绘兜底栏 100）
+   * @param leftInset 左侧内缩（2vp）
+   * @param step 两个入口之间的位移（官方栏 96，手绘兜底栏 104）
+   */
+  @Builder
+  selectedGlassPill(pillWidth: number, leftInset: number, step: number) {
+    Row()
+      .width(pillWidth)
+      .height(48)
+      .borderRadius(24)
+      // 小面积蓝色玻璃：backdropBlur 不带系统白色材质染色，
+      // 蓝色底 + 左上高光 + 白 rim，选中态才是“蓝玻璃”而不是白贴片
+      .backdropBlur(this.lightSense > LightSense.LEVEL_OFF ? 8 : 0)
+      .backgroundColor(ImmersiveStyles.tabSelectedBg(this.isDark))
+      .linearGradient({
+        angle: 135,
+        colors: this.lightSense > LightSense.LEVEL_OFF ? (this.isDark ? [
+          ['rgba(255, 255, 255, 0.22)', 0.0],
+          ['rgba(96, 165, 250, 0.06)', 0.5],
+          ['rgba(96, 165, 250, 0.14)', 1.0]
+        ] : [
+          ['rgba(255, 255, 255, 0.55)', 0.0],
+          ['rgba(10, 89, 247, 0.04)', 0.5],
+          ['rgba(10, 89, 247, 0.12)', 1.0]
+        ]) : [
+          ['rgba(0, 0, 0, 0)', 0.0],
+          ['rgba(0, 0, 0, 0)', 1.0]
+        ]
+      })
+      .border({
+        width: 1,
+        color: this.lightSense > LightSense.LEVEL_OFF ?
+          (this.isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.9)') : Color.Transparent
+      })
+      .shadow({
+        radius: 10,
+        color: this.lightSense > LightSense.LEVEL_OFF ?
+          ImmersiveStyles.tabSelectedGlow(this.isDark) : Color.Transparent,
+        offsetX: 0,
+        offsetY: 0
+      })
+      // 300ms 摩擦曲线：胶囊从左侧入口平滑滑到右侧入口
+      .translate({ x: this.currentIndex === SETTING_TAB_INDEX ? leftInset + step : leftInset, y: 0 })
+      .animation({ duration: 300, curve: Curve.Friction })
+  }
+
+  /** 官方栏里的单个透明入口：点击切换内容，视觉由下面的滑动胶囊承担 */
   @Builder
   officialBarItem(index: number, title: Resource, icon: Resource) {
-    Row() {
-      if (this.currentIndex === index && this.lightSense > LightSense.LEVEL_OFF) {
-        // 选中态本身就是一块玻璃：官方毛玻璃 + 蓝色赋色 + 光感渐变 + 玻璃 rim。
-        // 不再依赖“在 TabBar 里再嵌一层 systemMaterial”（第二页签上会不生效），
-        // 手绘玻璃配方在所有页签、所有系统版本上表现一致。
-        Column({ space: 2 }) {
-          this.barItemContent(index, title, icon)
-        }
-        .width('96%')
-        .height(48)
-        .justifyContent(FlexAlign.Center)
-        .borderRadius(24)
-        // 小面积蓝色玻璃：backdropBlur 不带系统白色材质染色，
-        // 蓝色底 + 左上高光 + 白 rim，选中态才是“蓝玻璃”而不是白贴片
-        .backdropBlur(8)
-        .backgroundColor(this.isDark ? 'rgba(96, 165, 250, 0.16)' : 'rgba(10, 89, 247, 0.14)')
-        .linearGradient({
-          angle: 135,
-          colors: this.isDark ? [
-            ['rgba(255, 255, 255, 0.22)', 0.0],
-            ['rgba(96, 165, 250, 0.06)', 0.5],
-            ['rgba(96, 165, 250, 0.14)', 1.0]
-          ] : [
-            ['rgba(255, 255, 255, 0.55)', 0.0],
-            ['rgba(10, 89, 247, 0.04)', 0.5],
-            ['rgba(10, 89, 247, 0.12)', 1.0]
-          ]
-        })
-        .border({
-          width: 1,
-          color: this.isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.9)'
-        })
-        .shadow({
-          radius: 10,
-          color: ImmersiveStyles.tabSelectedGlow(this.isDark),
-          offsetX: 0,
-          offsetY: 0
-        })
-        .animation({ duration: 200, curve: Curve.EaseInOut })
-      } else {
-        Column({ space: 2 }) {
-          this.barItemContent(index, title, icon)
-        }
-        .width('96%')
-        .height(48)
-        .justifyContent(FlexAlign.Center)
-        .borderRadius(24)
-        .backgroundColor(this.currentIndex === index ? ImmersiveStyles.tabSelectedBg(this.isDark) : Color.Transparent)
-        .animation({ duration: 200, curve: Curve.EaseInOut })
-      }
+    Column({ space: 2 }) {
+      this.barItemContent(index, title, icon)
     }
-    .width('100%')
+    .width(96)
     .height(48)
     .justifyContent(FlexAlign.Center)
+    .onClick(() => {
+      this.handleTabClick(index);
+      this.tabsController.changeIndex(index);
+    })
   }
 
   /** 图标 + 文字的公共内容（官方栏/手绘兜底栏共用） */
@@ -1032,9 +1051,16 @@ export struct HomePage {
    */
   @Builder
   glassBar() {
-    Row() {
-      this.glassTabItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings'))
-      this.glassTabItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting'))
+    Stack({ alignContent: Alignment.TopStart }) {
+      // 手绘栏同样用一块滑动胶囊，两个入口只是透明点击区
+      this.selectedGlassPill(100, 2, 104)
+
+      Row() {
+        this.glassTabItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings'))
+        this.glassTabItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting'))
+      }
+      .width(208)
+      .height(48)
     }
     .width(TAB_BAR_WIDTH)
     .height(TAB_BAR_HEIGHT)
@@ -1064,15 +1090,9 @@ export struct HomePage {
     Column({ space: 2 }) {
       this.barItemContent(index, title, icon)
     }
-    .layoutWeight(1)
+    .width(104)
     .height(48)
     .justifyContent(FlexAlign.Center)
-    .borderRadius(24)
-    .backgroundColor(this.currentIndex === index ? ImmersiveStyles.tabSelectedBg(this.isDark) : Color.Transparent)
-    .shadow(this.currentIndex === index ?
-      { radius: 12, color: ImmersiveStyles.tabSelectedGlow(this.isDark), offsetX: 0, offsetY: 0 } :
-      { radius: 0, color: Color.Transparent, offsetX: 0, offsetY: 0 })
-    .animation({ duration: 200, curve: Curve.EaseInOut })
     .onClick(() => {
       this.handleTabClick(index);
       this.tabsController.changeIndex(index);
@@ -1124,13 +1144,16 @@ export struct HomePage {
       .height('100%')
       .barHeight(0)
       .barMode(BarMode.Fixed)
+      // 手势滑动一开始就切换胶囊选中态，让“页面滑动”和“胶囊滑动”同时发生
+      .onAnimationStart((_index: number, targetIndex: number) => {
+        if (targetIndex !== this.currentIndex) {
+          this.currentIndex = targetIndex;
+        }
+      })
       .onChange((index: number) => {
         if (index !== this.currentIndex) {
+          // 内容滑动/点击切换后，overlay 的滑动胶囊会自动平移到新位置
           this.currentIndex = index;
-          // 内容滑动时同步官方悬浮栏选中态
-          if (this.useOfficialBar()) {
-            this.barTabsController.changeIndex(index);
-          }
         }
       })
 
