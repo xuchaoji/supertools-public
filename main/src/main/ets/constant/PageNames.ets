@@ -12,4 +12,6 @@ export class PageNames {
   public static readonly H5_PAGE = 'h5Page';
   public static readonly HDC_DEBUG_PAGE = 'hdcDebugPage';
   public static readonly QR_CODE_PAGE = 'qrCodePage';
+  public static readonly ADS_KIT_PAGE: string = 'adsKitPage';
+  public static readonly ADS_HSP_PAGE: string = 'adsHspPage';
 }

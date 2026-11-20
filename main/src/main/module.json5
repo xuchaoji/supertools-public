@@ -1,4 +1,4 @@
-﻿{
+{
   "module": {
     "name": "main",
     "type": "entry",
@@ -53,6 +53,16 @@
       }
     ],
     "requestPermissions": [
+      {
+        "name": "ohos.permission.APP_TRACKING_CONSENT",
+        "reason": "$string:APP_TRACKING_CONSENTPermissions_desc",
+        "usedScene": {
+          "abilities": [
+            "MainAbility"
+          ],
+          "when": "inuse"
+        }
+      },
       {
         "name": "ohos.permission.INTERNET"
       },

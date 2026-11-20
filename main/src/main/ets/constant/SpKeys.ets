@@ -25,4 +25,20 @@ export class SpKeys {
   public static readonly APP_LINK_LAUNCH_MODE: string = 'app_link_launch_mode';
   /** HDC 调试页终端输出字号（number，9~24，默认 13） */
   public static readonly HDC_TERM_FONT_SIZE: string = 'hdc_term_font_size';
+  /** Ads Kit 开屏广告位 ID。 */
+  public static readonly AD_SPLASH_ID: string = 'ad_splash_id';
+  /** Ads Kit 原生广告位 ID。 */
+  public static readonly AD_NATIVE_ID: string = 'ad_native_id';
+  /** Ads Kit 激励广告位 ID。 */
+  public static readonly AD_REWARD_ID: string = 'ad_reward_id';
+  /** Ads Kit 横幅广告位 ID。 */
+  public static readonly AD_BANNER_ID: string = 'ad_banner_id';
+  /** Ads Kit 插屏广告位 ID。 */
+  public static readonly AD_INTERSTITIAL_ID: string = 'ad_interstitial_id';
+  /** Ads Kit 贴片广告位 ID。 */
+  public static readonly AD_ROLL_ID: string = 'ad_roll_id';
+  /** Ads Kit 六类广告位 ID 的 JSON 备份/导入键。 */
+  public static readonly ADS_KIT_IDS_JSON: string = 'ads_kit_ids_json';
+  /** AdsKit 测试入口是否已通过设置页连点解锁。 */
+  public static readonly ENABLE_ADS_KIT_VISIBLE: string = 'enable_ads_kit_visible';
 }

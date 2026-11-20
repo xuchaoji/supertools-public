@@ -23,6 +23,10 @@
     {
       "name": "CameraPermissions_desc",
       "value": "用于扫码解析App Linking链接"
+    },
+    {
+      "name": "APP_TRACKING_CONSENTPermissions_desc",
+      "value": "用于AdsKit广告测试的个性化推荐授权"
     }
   ]
 }

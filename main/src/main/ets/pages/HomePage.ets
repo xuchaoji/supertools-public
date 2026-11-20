@@ -50,6 +50,9 @@ export struct HomePage {
   @Local currentIndex: number = 0;
   @Local settingsClickCount: number = 0;
   @Local isHdcVisible: boolean = false;
+  /** AdsKit 广告测试入口：设置页连点彩蛋解锁后持久显示 */
+  @Local isAdsKitVisible: boolean = false;
+  private adsKitPushInProgress: boolean = false;
   // 沉浸光感：跟随系统深/浅色模式
   @Local isDark: boolean = false;
   private themeMq: mediaquery.MediaQueryListener | null = null;
@@ -131,6 +134,34 @@ export struct HomePage {
         HMRouterMgr.push({ pageUrl: PageNames.HDC_DEBUG_PAGE })
       }
     }
+  ,
+  {
+    name: 'AdsKit广告测试',
+    desc: '测试开屏、横幅、插屏、激励与原生广告',
+    icon: $r('app.media.hdc_debug'),
+    onClick: () => {
+      if (this.adsKitPushInProgress) {
+        return;
+      }
+      this.adsKitPushInProgress = true;
+      HMRouterMgr.push({ pageUrl: PageNames.ADS_KIT_PAGE });
+      setTimeout(() => {
+        this.adsKitPushInProgress = false;
+      }, 500);
+    }
+  }
+,
+  {
+    name: 'Ads Hsp广告',
+    desc: 'HSP 广告接入测试，复用广告位配置与加载展示',
+    icon: $r('app.media.hdc_debug'),
+    onClick: () => {
+      if (this.adsKitPushInProgress) { return; }
+      this.adsKitPushInProgress = true;
+      HMRouterMgr.push({ pageUrl: PageNames.ADS_HSP_PAGE });
+      setTimeout(() => { this.adsKitPushInProgress = false; }, 500);
+    }
+  }
   ];
   @Local itemData: DragCardModel = new DragCardModel();
   // 内容区壁纸 PixelMap：盖住 NavDestination 的白底（Index 根级壁纸负责状态栏区域）
@@ -185,6 +216,7 @@ export struct HomePage {
     this.isHdcVisible = TargetConstants.HDC_DEBUG_ENABLED &&
       (!TargetConstants.IS_AG_TARGET ||
         PreferencesUtil.getBooleanSync(SpKeys.ENABLE_HDC_VISIBLE, false));
+    this.isAdsKitVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_ADS_KIT_VISIBLE, false);
     // 设备信息：default / dev 两个 target 均默认可见
     this.listData.push({
       name: '设备信息',
@@ -646,8 +678,10 @@ export struct HomePage {
     if (this.settingsClickCount >= this.REQUIRED_CLICKS) {
       PreferencesUtil.put(SpKeys.ENABLE_SCAN_PARSE, true);
       PreferencesUtil.put(SpKeys.ENABLE_HDC_VISIBLE, true);
+      PreferencesUtil.put(SpKeys.ENABLE_ADS_KIT_VISIBLE, true);
       this.isHdcVisible = true;
-      promptAction.showToast({ message: '扫码解析 + HDC调试功能已启用', duration: 1500 });
+      this.isAdsKitVisible = true;
+      promptAction.showToast({ message: '扫码解析 + HDC调试 + AdsKit已启用', duration: 1500 });
       this.settingsClickCount = 0;
     }
   }
@@ -655,7 +689,8 @@ export struct HomePage {
   /** 当前实际渲染的工具列表；拖拽索引必须与此列表保持一致。 */
   private visibleTools(): ToolCardItem[] {
     return this.listData.filter((item: ToolCardItem) =>
-      !(item.name === 'HDC 调试' && !this.isHdcVisible));
+      !(item.name === 'HDC 调试' && !this.isHdcVisible) &&
+      !((item.name === 'AdsKit广告测试' || item.name === 'Ads Hsp广告') && !this.isAdsKitVisible));
   }
 
   /** 保存当前工具卡片顺序（按 name） */

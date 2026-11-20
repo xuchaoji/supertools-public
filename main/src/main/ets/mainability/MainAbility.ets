@@ -11,6 +11,7 @@ import { CommonViewModel } from '../viewmodel/CommonViewModel';
 import { FloatClockManager } from '../capabilities/floatingclock/FloatClockManager';
 import { StressFloatWindowManager } from '../capabilities/floatingstress/StressWindowManager';
 import { WebServerUtil } from '../utils/WebServerUtil';
+import advertising from '@hw-ads/ads';
 import { TargetConstants } from 'main/ets/TargetConstants';
 
 const DOMAIN = 0x0000;
@@ -19,6 +20,11 @@ const TAG: string = 'MainAbility';
 
 export default class MainAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    try {
+      advertising.init(this.context);
+    } catch (e) {
+      hilog.warn(DOMAIN, TAG, 'Ads SDK init skipped or already initialized');
+    }
     this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
     AppUtil.init(this.context);
