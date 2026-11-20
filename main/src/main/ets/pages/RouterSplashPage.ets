@@ -1,4 +1,4 @@
-import { router } from '@kit.ArkUI';
+import { router, window } from '@kit.ArkUI';
 import { BusinessError } from '@kit.BasicServicesKit';
 import { AppUtil } from '@pura/harmony-utils';
 import { PageNames } from '../constant/PageNames';
@@ -33,10 +33,54 @@ struct RouterSplashPage {
   private timerId: number = -1;
   /** 防止倒计时归零与「跳过」同时触发两次 replaceUrl */
   private jumped: boolean = false;
+  private win: window.Window | undefined = undefined;
+  /** 开屏前状态栏文字颜色：离开开屏页时恢复，避免影响主页 */
+  private originalStatusBarContentColor: string = '';
+  private pageGone: boolean = false;
 
   aboutToAppear(): void {
     this.safeTop = `${AppUtil.getStatusBarHeight()}px`;
     this.safeBottom = SafeArea.bottom();
+    this.applyLightStatusBar();
+  }
+
+  /** 深色开屏背景下把状态栏文字/图标切成白色，离开时恢复原值 */
+  private applyLightStatusBar(): void {
+    try {
+      const ctx = this.getUIContext().getHostContext();
+      if (!ctx) {
+        return;
+      }
+      window.getLastWindow(ctx).then((win: window.Window) => {
+        if (this.pageGone) {
+          return;
+        }
+        this.win = win;
+        try {
+          this.originalStatusBarContentColor = win.getWindowSystemBarProperties().statusBarContentColor ?? '';
+          win.setWindowSystemBarProperties({ statusBarContentColor: '#FFFFFF' }).catch(() => {
+          });
+        } catch (e) {
+          console.warn(`[${TAG}] set light status bar failed: ${JSON.stringify(e)}`);
+        }
+      }).catch((e: Object) => {
+        console.warn(`[${TAG}] getLastWindow failed: ${JSON.stringify(e)}`);
+      });
+    } catch (e) {
+      console.warn(`[${TAG}] applyLightStatusBar failed: ${JSON.stringify(e)}`);
+    }
+  }
+
+  private restoreStatusBar(): void {
+    if (!this.win || this.originalStatusBarContentColor === '') {
+      return;
+    }
+    try {
+      this.win.setWindowSystemBarProperties({ statusBarContentColor: this.originalStatusBarContentColor }).catch(() => {
+      });
+    } catch (e) {
+      console.warn(`[${TAG}] restore status bar failed: ${JSON.stringify(e)}`);
+    }
   }
 
   onPageShow(): void {
@@ -49,7 +93,9 @@ struct RouterSplashPage {
   }
 
   aboutToDisappear(): void {
+    this.pageGone = true;
     this.stopCountdown();
+    this.restoreStatusBar();
   }
 
   private startCountdown(): void {
