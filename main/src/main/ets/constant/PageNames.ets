@@ -14,4 +14,15 @@ export class PageNames {
   public static readonly QR_CODE_PAGE = 'qrCodePage';
   public static readonly ADS_KIT_PAGE: string = 'adsKitPage';
   public static readonly ADS_HSP_PAGE: string = 'adsHspPage';
+
+  // ===================== 系统 router 页面 =====================
+  // 与上面的 HMRouter pageUrl 不同：这里必须是真正注册在
+  // `resources/base/profile/main_pages.json` 里的页面路径（带 pages/ 前缀），
+  // 供 router.pushUrl / router.back 按路径跳转使用。
+  public static readonly ROUTER_DEMO_PAGE: string = 'pages/RouterDemoPage';
+  public static readonly ROUTER_DEMO_DETAIL_PAGE: string = 'pages/RouterDemoDetailPage';
+  /** 模拟应用启动：开屏页（5 秒，后续接入开屏广告） */
+  public static readonly ROUTER_SPLASH_PAGE: string = 'pages/RouterSplashPage';
+  /** 模拟应用启动：启动完成后的应用主页 */
+  public static readonly ROUTER_MAIN_PAGE: string = 'pages/RouterMainPage';
 }

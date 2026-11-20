@@ -1,6 +1,10 @@
 {
   "src": [
     "pages/Index",
+    "pages/RouterDemoPage",
+    "pages/RouterDemoDetailPage",
+    "pages/RouterSplashPage",
+    "pages/RouterMainPage",
     "pages/AdsKitPage",
     "pages/AdsHspPage",
     "pages/FloatBallPage",

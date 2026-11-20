@@ -8,7 +8,8 @@ import { AppUtil, PreferencesUtil } from "@pura/harmony-utils";
 import promptAction from '@ohos.promptAction';
 import { RecordViewModel } from "../viewmodel/RecordViewModel";
 import { media } from "@kit.MediaKit";
-import { mediaquery, display } from '@kit.ArkUI';
+import { mediaquery, display, router } from '@kit.ArkUI';
+import { BusinessError } from '@kit.BasicServicesKit';
 import { image } from '@kit.ImageKit';
 import { motion } from '@kit.MultimodalAwarenessKit';
 import { ImmersiveStyles } from '../utils/ImmersiveStyles';
@@ -29,6 +30,8 @@ import { StressFloatWindowManager } from "../capabilities/floatingstress/StressW
 import { TargetConstants } from "main/ets/TargetConstants";
 import { WebServerUtil } from "../utils/WebServerUtil";
 import { FloatWindowUtil } from "../utils/FloatWindowUtil";
+import { RouterEntryParams } from "../model/RouterDemoParams";
+import { Toast } from "../utils/Toast";
 
 const TAG: string = 'HOME_PAGE';
 
@@ -52,7 +55,11 @@ export struct HomePage {
   @Local isHdcVisible: boolean = false;
   /** AdsKit 广告测试入口：设置页连点彩蛋解锁后持久显示 */
   @Local isAdsKitVisible: boolean = false;
+  /** Router 测试入口：默认隐藏，设置页连点彩蛋解锁后持久显示 */
+  @Local isRouterDemoVisible: boolean = false;
   private adsKitPushInProgress: boolean = false;
+  /** Router 演示页跳转中：防止快速连点把同一个 router 页面压入多次 */
+  private routerDemoPushInProgress: boolean = false;
   // 沉浸光感：跟随系统深/浅色模式
   @Local isDark: boolean = false;
   private themeMq: mediaquery.MediaQueryListener | null = null;
@@ -136,6 +143,15 @@ export struct HomePage {
     }
   ,
   {
+    name: 'Router 页面跳转',
+    desc: '系统 router 页面栈跳转演示',
+    icon: $r('app.media.router_demo'),
+    onClick: () => {
+      this.openRouterDemo();
+    }
+  }
+  ,
+  {
     name: 'AdsKit广告测试',
     desc: '测试开屏、横幅、插屏、激励与原生广告',
     icon: $r('app.media.hdc_debug'),
@@ -217,6 +233,8 @@ export struct HomePage {
       (!TargetConstants.IS_AG_TARGET ||
         PreferencesUtil.getBooleanSync(SpKeys.ENABLE_HDC_VISIBLE, false));
     this.isAdsKitVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_ADS_KIT_VISIBLE, false);
+    // Router 测试入口同样默认隐藏，需要通过设置页连点彩蛋手动解锁
+    this.isRouterDemoVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_ROUTER_DEMO_VISIBLE, false);
     // 设备信息：default / dev 两个 target 均默认可见
     this.listData.push({
       name: '设备信息',
@@ -247,6 +265,36 @@ export struct HomePage {
     this.wallpaperBlur = WallpaperUtil.getBlur();
     this.lightSense = LightSense.getLevel();
     this.loadWallpaperPm();
+  }
+
+  /**
+   * 工具箱入口：从 HMRouter 页面跳到一个由系统 router 管理的页面。
+   *
+   * 这里刻意用 router.pushUrl 而不是 HMRouterMgr.push，用来演示
+   * router 页面栈与 HMNavigation 的 NavPathStack 是两套独立栈：
+   * router 页面进出只会让 Index 走 onPageHide/onPageShow，
+   * 不会破坏 HMNavigation 内部状态，返回后 HomePage 原样保留。
+   */
+  private openRouterDemo(): void {
+    if (this.routerDemoPushInProgress) {
+      return;
+    }
+    this.routerDemoPushInProgress = true;
+    setTimeout(() => {
+      this.routerDemoPushInProgress = false;
+    }, 500);
+    const params: RouterEntryParams = new RouterEntryParams();
+    params.from = 'pages/Index (HomePage)';
+    params.tool = 'Router 页面跳转';
+    params.ts = Date.now();
+    router.pushUrl({ url: PageNames.ROUTER_DEMO_PAGE, params: params })
+      .then(() => {
+        hilog.info(0x0000, TAG, 'router.pushUrl -> %{public}s ok', PageNames.ROUTER_DEMO_PAGE);
+      })
+      .catch((err: BusinessError) => {
+        hilog.error(0x0000, TAG, 'router.pushUrl failed: %{public}s', JSON.stringify(err));
+        Toast.show(`router 跳转失败：${err.code}`);
+      });
   }
 
   /** 当前 HDS 悬浮栏样式：双手/未知 = 固定宽度居中；单手握持 = 收窄 + 系统原生贴边 */
@@ -679,9 +727,11 @@ export struct HomePage {
       PreferencesUtil.put(SpKeys.ENABLE_SCAN_PARSE, true);
       PreferencesUtil.put(SpKeys.ENABLE_HDC_VISIBLE, true);
       PreferencesUtil.put(SpKeys.ENABLE_ADS_KIT_VISIBLE, true);
+      PreferencesUtil.put(SpKeys.ENABLE_ROUTER_DEMO_VISIBLE, true);
       this.isHdcVisible = true;
       this.isAdsKitVisible = true;
-      promptAction.showToast({ message: '扫码解析 + HDC调试 + AdsKit已启用', duration: 1500 });
+      this.isRouterDemoVisible = true;
+      promptAction.showToast({ message: '扫码解析 + HDC调试 + AdsKit + Router测试已启用', duration: 1500 });
       this.settingsClickCount = 0;
     }
   }
@@ -690,6 +740,7 @@ export struct HomePage {
   private visibleTools(): ToolCardItem[] {
     return this.listData.filter((item: ToolCardItem) =>
       !(item.name === 'HDC 调试' && !this.isHdcVisible) &&
+      !(item.name === 'Router 页面跳转' && !this.isRouterDemoVisible) &&
       !((item.name === 'AdsKit广告测试' || item.name === 'Ads Hsp广告') && !this.isAdsKitVisible));
   }
 

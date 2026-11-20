@@ -37,7 +37,7 @@
 | 类别 | 技术 / 库 |
 |---|---|
 | UI 框架 | ArkUI `@ComponentV2` 声明式框架（部分旧页面使用 `@Component` v1） |
-| 路由 | `@hadss/hmrouter` (HMNavigation + `@HMRouter` 装饰器) + `@hadss/hmrouter-transitions` |
+| 路由 | `@hadss/hmrouter` (HMNavigation + `@HMRouter` 装饰器) + `@hadss/hmrouter-transitions`；另有系统 `router` 演示页（`pages/RouterDemo*`，仅用于路由共存演示） |
 | 状态管理 | ArkUI V2 响应式 (`@ObservedV2`, `@Trace`, `@Local`, `@Param`, `@Require`, `@Event`, `@Monitor`, `@Builder`, `@BuilderParam`, `PersistenceV2`, `AppStorage`) |
 | 工具库 | `@pura/harmony-utils` (AppUtil, PreferencesUtil, ToastUtil, DialogUtil, DateUtil, FileUtil) |
 | 文件/图片选择 | `@pura/picker_utils` (PhotoHelper) |
@@ -106,7 +106,7 @@ supertools-public/
         │   │   ├── TargetConstants.ets          # 特性开关 (默认: HAS_FLOATING_PERM=true)
         │   │   ├── mainability/MainAbility.ets  # UIAbility 入口
         │   │   ├── mainbackupability/MainBackupAbility.ets  # 备份 Extension
-        │   │   ├── pages/          # 10 个页面组件 (@Entry)
+        │   │   ├── pages/          # 页面组件 (HMRouter 页面 + 系统 router 演示页)
         │   │   ├── components/     # 5 个可复用 UI 组件
         │   │   ├── widgets/        # 4 个复合控件
         │   │   ├── utils/          # 9 个工具/服务类
@@ -129,19 +129,30 @@ supertools-public/
 {
   "src": [
     "pages/Index",
+    "pages/RouterDemoPage",
+    "pages/RouterDemoDetailPage",
+    "pages/RouterSplashPage",
+    "pages/RouterMainPage",
     "pages/FloatBallPage",
     "capabilities/floatingclock/FloatClockPage",
     "capabilities/floatingstress/StressCapsulePage"
   ]
 }
 ```
-> **重要**: 通过 `@HMRouter` 注册的页面**不需要**在 `main_pages.json` 中额外注册。仅系统浮窗页面（TYPE_FLOAT window）必须在此注册。
+> **重要**: 通过 `@HMRouter` 注册的页面**不需要**在 `main_pages.json` 中额外注册。仅系统浮窗页面（TYPE_FLOAT window）与**系统 `router` 页面**必须在此注册。
+>
+> `pages/RouterDemoPage` / `pages/RouterDemoDetailPage` / `pages/RouterSplashPage` / `pages/RouterMainPage` 是故意保留的**系统 router 演示页**：工具箱「Router 页面跳转」入口用 `router.pushUrl` 进入，与 HMRouter 的 NavPathStack 互不影响，用于演示两套路由栈共存。其中「模拟应用打开」会进入开屏页，5 秒后 `router.replaceUrl` 到模拟主页（开屏页不留在栈内）。
+> **入口默认隐藏**：需要「设置页连点彩蛋」（5 秒内在设置 tab 连点 8 次）写入 `ENABLE_ROUTER_DEMO_VISIBLE` 后才出现。
 
 **页面清单 (完整)：**
 
 | 文件 | 入口类型 | 注册方式 | 功能 |
 |---|---|---|---|
 | `pages/Index.ets` | `@Entry` | main_pages.json | HMNavigation 根容器 |
+| `pages/RouterDemoPage.ets` | `@Entry` | main_pages.json | 系统 router 演示页（第一页） |
+| `pages/RouterDemoDetailPage.ets` | `@Entry` | main_pages.json | 系统 router 演示页（详情/回传结果） |
+| `pages/RouterSplashPage.ets` | `@Entry` | main_pages.json | 模拟应用开屏（5 秒，广告占位） |
+| `pages/RouterMainPage.ets` | `@Entry` | main_pages.json | 模拟应用主页（replaceUrl 进入） |
 | `pages/FloatBallPage.ets` | `@Entry` | main_pages.json | 浮窗小球 (Web 状态跑马灯) |
 | `pages/GuidePage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 隐私协议同意引导页 |
 | `pages/PrivacyPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 隐私政策 WebView 展示 |
