@@ -1161,6 +1161,10 @@ export struct HomePage {
     }
     .width('100%')
     .height('100%')
+    // 页面底色必须一直铺到系统手势条上沿：否则 Stack 的底部 padding 区域会
+    // 露出 NavDestination 的白色底，形成一条“底部没有沉浸”的白条。
+    // 有壁纸时透明让壁纸透出，无壁纸时与内容区同一灰底。
+    .backgroundColor(this.wallpaperPath === '' ? $r('sys.color.background_secondary') : Color.Transparent)
     // 给系统手势条留出区域，悬浮胶囊悬浮在其上方
     .padding({ bottom: `${AppUtil.getNavigationIndicatorHeight()}px` })
   }
