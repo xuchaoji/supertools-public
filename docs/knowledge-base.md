@@ -10,12 +10,12 @@
 |---|---|
 | 项目名 | supertools-public |
 | 应用 ID | `com.xuchaoji.hmos.supertools` |
-| 版本 | 2.1.2 (versionCode: 2001002) |
-| 平台 | HarmonyOS (OpenHarmony) 5.0 |
-| SDK 版本 | API 12 (Stage 模型), SDK 5.0.5(17) |
+| 版本 | 3.0.0 (versionCode: 3000000) |
+| 平台 | HarmonyOS 5.0+（targetSdkVersion 26.0.0，兼容 5.0.5） |
+| SDK 版本 | 编译/目标 API 26.0.0(26)；compatibleSdkVersion 5.0.5(17) |
 | 目标设备 | phone, tablet, 2in1 |
 | 语言 | ArkTS (strict mode: `caseSensitiveCheck` + `useNormalizedOHMUrl`) |
-| 构建系统 | Hvigor 5.0.5 |
+| 构建系统 | Hvigor 5.0.5（modelVersion）/ DevEco 6.1.1.300 SDK API 26 |
 | 包管理器 | ohpm |
 | 全局根页面 | `pages/Index` (HMNavigation 容器, `homePageUrl: PageNames.GUIDE_PAGE`) |
 
@@ -347,7 +347,7 @@ try {
 - 优先使用系统资源引用：`$r('sys.color.background_primary')`，`$r('sys.float.corner_radius_level4')`
 - 自定义颜色使用 hex/RGBA：`'#FF6B6B'`，`'rgba(255, 255, 255, 0.8)'`
 - 间距使用 `'vp'` 单位：`'16vp'`，`'8vp'`
-- 毛玻璃效果组合：`.backgroundColor('rgba(255,255,255,0.8)').backgroundBlurStyle(BlurStyle.COMPONENT_THICK)`
+- 毛玻璃效果组合：`.backgroundBlurStyle(...)`；卡片/设置分组统一走 `ImmersiveStyles.cardBlurStyle()`，**不要再用裸 `backdropBlur` 叠两层**（小面积控件如按钮/输入框/选中胶囊才用 `backdropBlur`）
 - **禁止使用 `gridSpan`**（已弃用），改用 `constraintSize`
 - **禁止在 `Row` 上使用 `minHeight`**，改用 `.constraintSize({ minHeight: '100vp' })`
 
@@ -365,6 +365,11 @@ try {
 >
 > **坑 2（底部必须自己避让）**：`Index` 不处理底部，页面内容会一直铺到手势条下方。
 > 曾出问题：HDC 页输入区、LocalWeb 文件列表、隐私页按钮被手势条压住。
+>
+> **坑 3（底部 padding 区域也要有底色）**：`MainAbility` 已把 status/nav bar 设透明，
+> 但页面底部 padding 区域不能是“无底色的裸容器”，否则会露出 NavDestination 白底，
+> 形成一条“底部没有沉浸”的白条。`HomePage.mainTabs` 外层 Stack 必须设置
+> `backgroundColor(wallpaperPath === '' ? 页面灰底 : Color.Transparent)`。
 
 统一入口是 `main/src/main/ets/utils/SafeArea.ets`：
 
@@ -406,7 +411,8 @@ hdc shell "uitest dumpLayout -p /data/local/tmp/l.xml"  # 看元素 bounds 是�
 | 组件模型 | `@ComponentV2` + `@Local` / `@Param` / `@Event` | V1 仅存于尚未迁移的旧页面 |
 | 页面背景 | `components/WallpaperHost.ets` | 根节点包一层，内容容器 `backgroundColor(Color.Transparent)` |
 | 页面标题栏 | `components/PageHeader.ets` | 玻璃圆底返回键 + 标题 + 副标题；`Index` 已 `hideNavBar(true)`，**不写标题栏就没有可见返回键** |
-| 卡片 | `components/GlassCard.ets` | 沉浸光感唯一配方（基底→毛玻璃→光感渐变→rim 亮边→点光源→投影） |
+| 卡片 | `components/GlassCard.ets` | 沉浸光感唯一配方（基底→官方 `backgroundBlurStyle`→光感渐变→rim 亮边→点光源→投影）；内容区不在 `systemMaterial` 生效范围，不要硬套 |
+| 底部悬浮 Tab 栏 | `pages/HomePage.ets` 的 `mainTabs / officialBarTabs` | 216vp 固定短宽度 + 滑动玻璃胶囊；官方材质 + 低版本兜底，详见 §6.15 |
 | 按钮 | `components/GlassButton.ets` | 内层高斯模糊背景透上来；可配 `bgColor`/`textColor`/`strokeWidth`/`strokeColor`/`blurRadius`/`padX` |
 | 输入框 | `utils/ImmersiveStyles.ets` 的 `inputBg/inputBlur/inputRim/inputRadius` | 半透明底 + 背景高斯模糊 + rim 亮边；**禁止**再用不透明的 `comp_background_gray` / `background_primary` |
 | 分组列表 | `components/SettingGroup.ets` | 需要自动分割线的设置项用这个（同一配方的 List 变体） |
@@ -1088,6 +1094,56 @@ main/src/main/cpp/types/libhdc_z/Index.d.ts
 
 ---
 
+### 6.15 沉浸光感与底部悬浮 Tab 栏（2026-11 重构）
+
+#### 6.15.1 能力矩阵与兼容保护
+
+| 能力 | 起始 API | 生效范围 | 项目用法 |
+|---|---|---|---|
+| `hdsEffect`（点光源 / visualEffect） | 20 | 任意组件 | `LightSense.lightVisualEffect()`；API<20 返回 `uiEffect.createEffect()` 空效果 |
+| `uiMaterial` / `systemMaterial` | 26 | Navigation/NavDestination 标题栏；横向 Tabs 的底部 TabBar | `LightSense.tabSystemMaterial()` + `barFloatingStyle.systemMaterial` |
+| `HoldingHandStatus`（智感握姿） | 20 | 系统握持姿态 | 仅 API 20+ 订阅 `holdingHandChanged` |
+| `backgroundBlurStyle` | 10 | 任意组件 | 卡片 / 设置分组 / 兜底 TabBar 的官方毛玻璃兜底 |
+
+- **禁止在字段初始化 / 构造期直接 new 高版本类**：`new HdsTabsController()`、`new hdsEffect.HdsEffectBuilder()` 在 5.0.1 一类的旧设备上会直接 crash。现在统一由 `LightSense` 做 `sdkApiVersion + canIUse + try/catch` 保护，低版本只走 `backgroundBlurStyle`。
+- `uiMaterial` 只在 `deviceInfo.sdkApiVersion >= 26` 后访问；先 `isImmersiveMaterialSupported()` 再创建材质。
+- `systemMaterial` 的作用范围是硬限制：**页面内容区的卡片不生效**；卡片继续用 `backgroundBlurStyle` + 渐变 + rim + 点光源。
+- `MainAbility` 在 `setWindowLayoutFullScreen(true)` 之后调用
+  `setWindowSystemBarProperties({ statusBarColor: '#00000000', navigationBarColor: '#00000000' })`，再 `loadContent`。
+
+#### 6.15.2 Tab 栏结构
+
+- 固定尺寸：`TAB_BAR_WIDTH = 216vp`、`TAB_BAR_HEIGHT = 56vp`、`TAB_BAR_AREA_HEIGHT = 64vp`、左右最小 16vp、内容底部避让 96vp。
+- 宽度**永不随握姿变化**，只有水平位置变化：左手 16vp、右手 `areaW - 216 - 16`、双手/未知居中；握姿事件 320ms 防抖，位置用 260ms 动画滑动。
+- 三层结构：
+  1. 内容 `Tabs`：`barHeight(0)`，只负责页面内容与左右滑动；
+  2. 官方材质栏：一条独立的 216vp 宽 `Tabs`，标签为空，用 `barFloatingStyle` 渲染 `systemMaterial` 背板；
+  3. overlay：两个透明入口 + 一整块滑动玻璃胶囊（`selectedGlassPill`）。
+- 选中胶囊参数：
+  - 官方栏：宽 92vp，槽位 96vp，左内缩 2vp；
+  - 兜底栏：宽 100vp，槽位 104vp，左内缩 2vp；
+  - `translate` 跟随 `currentIndex`，`animation({ duration: 300, curve: Curve.Friction })`；
+  - 玻璃配方：`backdropBlur(8)` + 半透明蓝色底 + 左上高光渐变 + 1px 白 rim + 淡蓝光晕；0 档退化为扁平蓝色选中。
+- 手势滑动时用内容 Tabs 的 `onAnimationStart` 提前同步 `currentIndex`，让页面滑动和胶囊滑动同时发生。
+- API 26 以下或光感关闭时，`glassBar()` 用同一套滑动胶囊，仅背板换成手绘玻璃。
+
+#### 6.15.3 光感档位的响应式广播
+
+`utils/LightSense.ets` 里的 `LightSenseState` 是 `@ObservedV2` + `@Trace level` 单例：
+
+- `LightSense.getLevel()` 读取 `lightSenseState.level`（首次从 Preferences 恢复）；
+- `ImmersiveStyles.*` 在 build 期间调用 `getLevel()`，从而建立响应式依赖；
+- 设置页拖动滑杆 → `setLevel()` 修改 `lightSenseState.level` → 所有玻璃表面立即重渲染。
+- **不要再在每次 build 里直接 `PreferencesUtil.getNumberSync()`**：那样不是响应式的，滑杆改了卡片不会刷新。
+
+#### 6.15.4 已知坑
+
+- 官方悬浮栏自带的 `BackgroundMask` / 矩形阴影会在圆角胶囊外露出直角白边：`barFloatingStyle` 设 `maskColor: Color.Transparent`、`maskHeight: 0`，`ImmersiveMaterial.applyShadow: false`，Tabs/TabContent 背景透明。
+- 选中胶囊不要 100% 撑满标签槽，留 2%~4% 内缩，否则圆角会被槽位边界裁成直角；也不要在胶囊上叠会被父容器裁剪的 shadow。
+- 底部白条不一定是系统导航条：先检查页面底部 padding 区域有没有底色（见 §5.7 坑 3）。
+- `targetSdkVersion` 写 `26.0.0`，不能写 `26.0.0(26)`（hvigor `ApiVersion` 解析会报 `api version parameter is illegal`）。
+- 在 TabBar 里再嵌一层 `systemMaterial` 做选中胶囊不可靠（第二个页签上可能不生效），统一用 overlay 的手绘滑动胶囊。
+
 ## 7. 构建系统
 
 ### 7.1 产品配置与签名
@@ -1099,6 +1155,8 @@ main/src/main/cpp/types/libhdc_z/Index.d.ts
 | `dev` | `com.xuchaoji.hmos.supertools.dev` | `dev` | `dev`（调试，绑设备+ACL） | 本地开发（含悬浮工具） |
 | `default` | `com.xuchaoji.hmos.supertools` | `product` | `default`（调试） | AG 版本地验证（悬浮隐藏） |
 | `release` | `com.xuchaoji.hmos.supertools` | `product` | `release`（发布，`sign/`） | AppGallery 提审打包 |
+
+**SDK 版本（2026-11）**：三个 product 的 `targetSdkVersion` 均为 `26.0.0`，`compatibleSdkVersion` 仍为 `5.0.5(17)`。hvigor 的 `ApiVersion` 只接受 `26.0.0` 形式（写 `26.0.0(26)` 会报 `api version parameter is illegal`）；`build-profile.json5` 受 skip-worktree 保护，改完必须同步 `build-profile.template.json5`，本机 `build-profile.local.json5` / `build-profile-pad-release.json5` 也要同步。
 
 **包名 ↔ 签名强绑定**：`.p7b` 描述文件与 bundleName 绑定（调试版还绑设备 UDID + ACL 权限）。
 因此**包名一旦定下就不要改**——改包名 = 整套签名作废、需重新申请。
@@ -1133,7 +1191,7 @@ node tools/setup_signing.js
 |---|---|---|
 | `build-profile.json5` | **提交（开箱即用骨架）** | 定义工程产品/模块/target，本地修改通过 skip-worktree 保护 |
 | `build-profile.local.json5` | 本机、忽略 | 本机备份 profile（含本机私有路径与口令） |
-| `build-profile.template.json5` | 提交 | 备用结构模板 + 填写说明 |
+| `build-profile.template.json5` | 提交 | 备用结构模板 + 填写说明；`targetSdkVersion` 已同步为 `26.0.0` |
 | `tools/setup_signing.js` / `.ps1` | 提交 | 跨平台本地签名保护与备份恢复工具 |
 | `oh-package-lock.json5` | **提交** | 锁定依赖解析结果，避免 caret 范围漂移 |
 
@@ -1484,7 +1542,7 @@ $r('app.string.setting_tab')
 
 | 文件 | 组件 | 模式 | 说明 |
 |---|---|---|---|
-| `GlassCard.ets` | `GlassCard` | V2 | **沉浸光感卡片唯一实现**（基底/毛玻璃/光感渐变/rim/点光源/投影），内容内边距由调用方给 |
+| `GlassCard.ets` | `GlassCard` | V2 | **沉浸光感卡片唯一实现**（基底 / 官方 `backgroundBlurStyle` / 光感渐变 / rim / 点光源 / 投影），内容内边距由调用方给 |
 | `GlassButton.ets` | `GlassButton` | V2 | **按钮唯一实现**：内层高斯模糊背景透上来；可配底色/文字色/描边宽/描边色/模糊半径/高度/字号/圆角/是否可点 |
 | `PageHeader.ets` | `PageHeader` | V2 | **页面标题栏唯一实现**（玻璃圆底返回键 + 标题 + 副标题；默认 `HMRouterMgr.pop()`，可传 `onBack`） |
 | `ImmersiveGlassCard.ets` | `ImmersiveGlassCard` | v1 | 旧的自绘玻璃卡片（仅 `FloatBallPage` 在用，新代码用 `GlassCard`） |
@@ -1492,6 +1550,10 @@ $r('app.string.setting_tab')
 | `SettingSwitchItem.ets` | `SettingSwitchItem` | V2 | 开关设置行 (title + Toggle + onChange 事件) |
 | `StressCapsule.ets` | `StressCapsule` | V2 | 悬浮压测面板 (拖拽 + 圆环 + 启停 + PanGesture 强度调节) |
 | `StressRing.ets` | `StressRing` | V2 | CPU/MEM 圆环指示器 (value/displayValue/label/isActive) |
+
+> 沉浸光感参数统一走 `utils/LightSense.ets`（档位 / 版本能力探测）与
+> `utils/ImmersiveStyles.ets`（颜色 / 模糊 / rim / 阴影）；不要在各页面写死 rgba 玻璃参数。
+> 档位通过 `LightSenseState`（`@ObservedV2` + `@Trace`）广播，详见 §6.15。
 
 ### 11.3 Widget 清单
 
@@ -1655,6 +1717,10 @@ export class SpKeys {
 ### 14.2 UI 自动化工作流
 
 ```
+0. 确认前台是 dev 包：hdc shell "aa dump -l" | grep supertools
+   或 hdc shell "ps -ef | grep supertools"
+   dev/release 可能同时安装；aa start .dev 后截图仍是旧 UI 时，
+   先 force-stop 两个包，再启动 dev，避免把 release 包当成 dev 验证
 1. hdc shell "uitest dumpLayout -p /data/local/tmp/layout.xml -b <bundle>"
 2. hdc file recv /data/local/tmp/layout.xml local_layout.xml
 3. 解析 JSON，找到目标元素的 bounds
@@ -1739,4 +1805,22 @@ export class SpKeys {
 - `build-profile-pad-release.json5` 等按设备形态区分的 profile 是本机文件（被忽略）；
   其中模块 target 名必须是 `main/build-profile.json5` 里声明过的 `product` / `dev`。
 - 构建后自检请跑 `tools/verify_build.ps1`（见 §7.5），它把上述约定固化成了断言。
+
+### 13.11 沉浸光感 / 底部 Tab 栏 / targetSdk（2026-11）
+- 旧设备 crash 的两个源头：字段初始化里的 `new HdsTabsController()` 和
+  `new hdsEffect.HdsEffectBuilder()`。高版本 API 必须懒执行并做版本/syscap 保护；
+  空 `visualEffect` 用 API 12 就有的 `uiEffect.createEffect()`。
+- `systemMaterial` 只在 Navigation/NavDestination 标题栏或横向 Tabs 的底部 TabBar 生效；
+  内容区卡片不生效，卡片统一用 `backgroundBlurStyle`。
+- 底部悬浮栏的直角白边来自官方 `barFloatingStyle` 的 `BackgroundMask` / 矩形阴影：
+  设 `maskColor: Color.Transparent`、`maskHeight: 0`、`applyShadow: false`，
+  Tabs/TabContent 背景透明。
+- 底部“没有沉浸”的白条优先检查 `mainTabs` Stack 的底部 padding 区域有没有底色，
+  不要只改系统导航条。
+- 选中胶囊要滑动 + 圆角完整：用 overlay 单胶囊 `translate`，槽位宽度留 2%~4% 内缩；
+  不要在 TabBar 标签里嵌第二层 `systemMaterial`（第二个页签上可能不生效）。
+- `targetSdkVersion` 写 `"26.0.0"`，不是 `"26.0.0(26)"`，否则 hvigor 报
+  `api version parameter is illegal`。
+- 验证 UI 前先确认前台是 `.dev` 包（`aa dump -l` / `ps -ef`）；
+  dev/release 同时安装时，截图可能落在 release 包上。
 
