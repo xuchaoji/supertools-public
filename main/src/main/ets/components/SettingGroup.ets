@@ -39,7 +39,8 @@ export struct SettingGroup {
       // 与工具箱卡片背景保持一致的沉浸光感配方：
       // 基底色 -> 毛玻璃模糊 -> 光感渐变 -> rim 亮边 -> 点光源，不叠加 systemMaterial 染色
       .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
-      .backdropBlur(ImmersiveStyles.cardBlurRadius())
+      // 官方毛玻璃兜底：低版本同样可用，按光感档位切换薄/常规/通透
+      .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle(), { colorMode: ThemeColorMode.SYSTEM })
       .linearGradient({
         angle: 135,
         colors: ImmersiveStyles.cardSurfaceColors(this.isDark)

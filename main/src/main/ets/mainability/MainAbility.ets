@@ -153,7 +153,15 @@ export default class MainAbility extends UIAbility {
     // expandSafeArea 等安全区延伸在冷启动时不会覆盖状态栏（状态栏露出灰白背景）。
     // 因此把 loadContent 放到全屏 Promise 成功回调中执行。
     try {
-      windowStage.getMainWindowSync().setWindowLayoutFullScreen(true).then(() => {
+      const mainWindow = windowStage.getMainWindowSync();
+      mainWindow.setWindowLayoutFullScreen(true).then(() => {
+        // 底部手势条系统栏透明：否则页面铺满后，最底部仍会露出一条白色导航条，
+        // 设置壁纸时会出现“壁纸到最底部突然断掉”的白色边距。
+        return mainWindow.setWindowSystemBarProperties({
+          statusBarColor: '#00000000',
+          navigationBarColor: '#00000000'
+        });
+      }).then(() => {
         loadPage();
       }).catch((e: Object) => {
         hilog.error(DOMAIN, 'testTag', 'setWindowLayoutFullScreen failed: %{public}s', JSON.stringify(e));

@@ -18,8 +18,6 @@ import { LightSense } from '../utils/LightSense';
 import { PhotoHelper } from '@pura/picker_utils';
 import { photoAccessHelper } from '@kit.MediaLibraryKit';
 import { common } from '@kit.AbilityKit';
-import { deviceInfo } from '@kit.BasicServicesKit';
-import { HdsTabs, HdsTabsController, HdsTabsFloatingStyle, hdsMaterial } from '@kit.UIDesignKit';
 import { SettingGroup } from "../components/SettingGroup";
 import { SettingSwitchItem } from "../components/SettingSwitchItem";
 import { GlassButton } from "../components/GlassButton";
@@ -37,6 +35,22 @@ const TAG: string = 'HOME_PAGE';
 
 const TOOLS_TAB_INDEX = 0;
 const SETTING_TAB_INDEX = 1;
+
+/**
+ * 底部悬浮 Tab 栏尺寸（vp）。
+ * 设计目标：始终保持「单手可及」的短宽度，不随握持姿态变宽变窄；
+ * 单手握持时整体平移到握持侧，双手/未知握持时居中。
+ */
+const TAB_BAR_WIDTH: number = 216;
+const TAB_BAR_HEIGHT: number = 56;
+/** Tab 栏容器高度（悬浮胶囊 + 上下留白） */
+const TAB_BAR_AREA_HEIGHT: number = 64;
+/** 胶囊离屏幕左右边缘的最小间距（vp） */
+const TAB_BAR_SIDE_MARGIN: number = 16;
+/** 握持姿态防抖时间（ms）：过滤双手握持时左右手状态来回跳变导致的抖动 */
+const GRIP_DEBOUNCE_MS: number = 320;
+/** Tab 栏避让高度（vp）：容器高度 + 呼吸间距，内容可滚动到悬浮栏上方 */
+const TAB_BAR_CONTENT_INSET: number = 96;
 
 /** 裁切浮层顶部操作条的高度（vp）：按钮点击会冒泡到浮层 onTouch，按此排除按钮区域 */
 const TOP_BAR_STRIP_VP: number = 90;
@@ -69,19 +83,22 @@ export struct HomePage {
   @Local wallpaperBlur: number = 0;
   /** 全局光感档位（0=关闭 1=柔和 2=标准 3=精致），驱动 Tab 材质/卡片毛玻璃/点光源 */
   @Local lightSense: number = LightSense.LEVEL_EXQUISITE;
-  // 官方 HDS 沉浸光感 Tab（HdsTabs + systemMaterialEffect）
-  private hdsTabsController: HdsTabsController = new HdsTabsController();
-  // 设备系统版本 >= 6.1.0(API 23) 才支持 HDS 沉浸材质，否则降级为手绘悬浮胶囊
-  private supportImmersiveTabs: boolean = deviceInfo.distributionOSApiVersion >= 60100;
-  /** 智感握姿：握持侧（0=未知/未握持/双手 1=左手 2=右手），驱动 HDS 悬浮栏 adaptToHandedness */
+  /** 智感握姿：握持侧（0=未知/未握持/双手 1=左手 2=右手），驱动悬浮栏水平位置 */
   @Local gripSide: number = 0;
+  /** Tab 栏容器实测宽度（vp）：用于计算胶囊居中/贴边时的精确偏移 */
+  @Local barAreaWidth: number = 0;
   private gripSupported: boolean = false;
   private gripCallback: (status: motion.HoldingHandStatus) => void = () => {};
+  /** 握持姿态防抖：等姿态稳定后再移动胶囊，避免双手切换时左右跳变 */
+  private gripDebounceTimer: number = -1;
+  private pendingGripSide: number = 0;
   private lastSettingsClickTime: number = 0;
   private readonly REQUIRED_CLICKS: number = 8;
   private readonly CLICK_WINDOW_MS: number = 5000;
   private msgNum: number = 9999;
   private tabsController: TabsController = new TabsController();
+  /** 仅用于底部官方悬浮栏的 Tabs（只显示 TabBar，内容为空） */
+  private barTabsController: TabsController = new TabsController();
   @Local listData: ToolCardItem[] = [
     {
       name: 'App Linking 解析',
@@ -258,13 +275,26 @@ export struct HomePage {
     this.restoreToolOrder();
     // 沉浸光感：订阅系统深/浅色模式
     this.initThemeListener();
-    // 智感握姿：订阅握持姿态变化（双手保持固定宽度，单手自适应收窄贴边）
+    // Tab 栏宽度初值（vp）：首帧 onAreaChange 之前也能按“居中”正确摆放
+    this.barAreaWidth = this.screenWidthVp();
+    // 智感握姿：订阅握持姿态变化（宽度固定，仅左右位置跟随握持侧）
     this.initGripListener();
     // 恢复已设置的壁纸
     this.wallpaperPath = WallpaperUtil.getPath();
     this.wallpaperBlur = WallpaperUtil.getBlur();
     this.lightSense = LightSense.getLevel();
     this.loadWallpaperPm();
+  }
+
+  /** 当前屏幕宽度（vp，异常时按 360 兜底） */
+  private screenWidthVp(): number {
+    try {
+      const d = display.getDefaultDisplaySync();
+      const density = d.densityDPI / 160;
+      return density > 0 ? d.width / density : 360;
+    } catch (e) {
+      return 360;
+    }
   }
 
   /**
@@ -297,40 +327,46 @@ export struct HomePage {
       });
   }
 
-  /** 当前 HDS 悬浮栏样式：双手/未知 = 固定宽度居中；单手握持 = 收窄 + 系统原生贴边 */
-  private currentBarStyle(): HdsTabsFloatingStyle {
-    return {
-      // 单手握持时跟随手持方向（系统原生机制；支持的系统上悬浮栏贴近握持侧，
-      // 本机系统无左右手设置时保持居中）
-      adaptToHandedness: this.gripSide === 1 || this.gripSide === 2,
-      // 悬浮 Tab 栏宽度（vp）：双手 = 当前固定宽度（327）；单手 = 自适应收窄（216），
-      // 两个入口仍完整可见且更贴近拇指可及范围
-      barWidth: {
-        smallWidth: (this.gripSide === 1 || this.gripSide === 2) ? 216 : 327,
-        mediumWidth: (this.gripSide === 1 || this.gripSide === 2) ? 216 : 327,
-        largeWidth: (this.gripSide === 1 || this.gripSide === 2) ? 216 : 327
-      },
-      // 悬浮栏距底部间距（vp 单位；系统手势条约 33vp，这里留 40vp 避开）
-      barBottomMargin: 40,
-      systemMaterialEffect: {
-        // 材质类型/级别按全局光感档位：关闭=无材质，柔和=GENTLE，标准=SMOOTH，精致=EXQUISITE
-        materialType: LightSense.tabMaterialType(this.lightSense),
-        materialLevel: LightSense.tabMaterialLevel(this.lightSense),
-      },
-    };
+  /**
+   * Tab 栏胶囊的左偏移（vp）。
+   * 宽度永远固定为 TAB_BAR_WIDTH：不会随握持姿态变宽变窄；
+   * 单手握持只改变水平位置（左手贴左、右手贴右），双手/未知居中。
+   */
+  private tabBarLeftMargin(): number {
+    const areaW = this.barAreaWidth;
+    if (areaW <= 0) {
+      return TAB_BAR_SIDE_MARGIN;
+    }
+    const minLeft = TAB_BAR_SIDE_MARGIN;
+    const maxLeft = Math.max(minLeft, areaW - TAB_BAR_WIDTH - TAB_BAR_SIDE_MARGIN);
+    if (this.gripSide === 1) {
+      return minLeft;
+    }
+    if (this.gripSide === 2) {
+      return maxLeft;
+    }
+    const centered = (areaW - TAB_BAR_WIDTH) / 2;
+    return Math.min(Math.max(centered, 0), maxLeft);
   }
 
   /**
-   * 订阅智感握姿（握持姿态变化）——始终使用系统 HDS 悬浮栏，顺序/宽度固定：
-   * 双手/未知握持 → adaptToHandedness 关闭（居中）；
-   * 单手握持 → 启用系统原生 adaptToHandedness（支持的系统上悬浮栏自动贴近握持侧，
-   * 本机系统无左右手设置时保持居中，不影响任何切换）。
-   * 需要 ohos.permission.DETECT_GESTURE（normal 级 system_grant，安装时自动授予）。
+   * 订阅智感握姿（握持姿态变化）。
+   *
+   * - `HoldingHandStatus` / `holdingHandChanged` 自 API 20 才有，低版本直接不订阅，
+   *   悬浮栏保持居中（也不会访问不存在的枚举导致 crash）。
+   * - 宽度固定，只有水平位置跟随握持侧；单手 → 贴握持侧，双手/未知 → 居中。
+   * - 握姿事件在双手切换时可能来回跳（左/右手状态交替），用 320ms 防抖 +
+   *   “与当前值相同则忽略”避免胶囊左右抖动。
    */
   private initGripListener(): void {
     try {
+      // API 20 以下没有 HoldingHandStatus，直接保持居中
+      if (LightSense.sdkApiVersion() < 20) {
+        hilog.info(0x0000, TAG, 'grip: sdk < 20, keep tab bar centered');
+        return;
+      }
       if (!canIUse('SystemCapability.MultimodalAwareness.Motion')) {
-        hilog.info(0x0000, TAG, 'grip: Motion capability not supported, keep default tab bar');
+        hilog.info(0x0000, TAG, 'grip: Motion capability not supported, keep tab bar centered');
         return;
       }
       this.gripCallback = (status: motion.HoldingHandStatus) => {
@@ -340,8 +376,8 @@ export struct HomePage {
         } else if (status === motion.HoldingHandStatus.RIGHT_HAND_HELD) {
           side = 2;
         }
-        this.gripSide = side;
-        hilog.info(0x0000, TAG, 'grip changed -> side=%{public}d status=%{public}d', side, status);
+        // BOTH_HANDS_HELD / 未知状态统一按 0 处理：居中
+        this.scheduleGripSide(side);
       };
       motion.on('holdingHandChanged', this.gripCallback);
       this.gripSupported = true;
@@ -352,8 +388,39 @@ export struct HomePage {
     }
   }
 
+  /** 握姿防抖：姿态稳定 GRIP_DEBOUNCE_MS 后才移动胶囊 */
+  private scheduleGripSide(side: number): void {
+    if (side === this.pendingGripSide) {
+      return;
+    }
+    this.pendingGripSide = side;
+    if (this.gripDebounceTimer !== -1) {
+      clearTimeout(this.gripDebounceTimer);
+    }
+    this.gripDebounceTimer = setTimeout(() => {
+      this.gripDebounceTimer = -1;
+      this.applyGripSide(this.pendingGripSide);
+    }, GRIP_DEBOUNCE_MS);
+    hilog.info(0x0000, TAG, 'grip pending -> side=%{public}d', side);
+  }
+
+  /** 应用握持侧：只改水平位置，不改宽度；用动画平滑滑过去 */
+  private applyGripSide(side: number): void {
+    if (side === this.gripSide) {
+      return;
+    }
+    animateTo({ duration: 260, curve: Curve.EaseInOut }, () => {
+      this.gripSide = side;
+    });
+    hilog.info(0x0000, TAG, 'grip applied -> side=%{public}d', side);
+  }
+
   /** 退订智感握姿（页面销毁时释放） */
   private releaseGripListener(): void {
+    if (this.gripDebounceTimer !== -1) {
+      clearTimeout(this.gripDebounceTimer);
+      this.gripDebounceTimer = -1;
+    }
     if (!this.gripSupported) {
       return;
     }
@@ -688,25 +755,19 @@ export struct HomePage {
     AppStorage.setOrCreate<number>('WallpaperBlur', v);
   }
 
-  /** 调整全局光感档位：本地状态 + 持久化（HDS 悬浮栏材质随 @Local 重渲染自动更新，卡片毛玻璃按档位自动跟随） */
+  /** 调整全局光感档位：本地状态 + 持久化（Tab 材质/卡片毛玻璃按档位自动跟随） */
   private updateLightSense(value: number): void {
     const v = Math.min(Math.max(Math.round(value), 0), 3);
     this.lightSense = v;
     LightSense.setLevel(v);
   }
 
-  /** 内容底部呼吸间距（vp） */
+  /** 内容底部避让（vp）：盖住悬浮 Tab 栏 + 呼吸间距，保证最后一行能滚到胶囊上方 */
   private getContentBottomInset(): number {
-    if (!this.supportImmersiveTabs) {
-      // 手绘悬浮胶囊分支：内容延伸到悬浮胶囊下方，需要较大避让
-      return 88;
-    }
-    // 官方 HDS 分支：避让由页面内部的底部 spacer 完成（见 settingPage/toolList），
-    // 这里只留少量呼吸间距
-    return 16;
+    return TAB_BAR_CONTENT_INSET;
   }
 
-  /** Tab 点击统一处理：切换 + 设置页连点彩蛋（用于旧系统手绘胶囊等非 HDS 分支） */
+  /** Tab 点击统一处理：切换 + 设置页连点彩蛋（用于手绘兜底胶囊；官方 Tabs 分支由 onChange 同步） */
   private handleTabClick(index: number): void {
     this.currentIndex = index;
     this.handleSettingsEasterEgg(index);
@@ -797,57 +858,216 @@ export struct HomePage {
       .height(0)
   }
 
-  /** 沉浸光感悬浮导航胶囊：不贴底、左右留白、圆角毛玻璃材质 */
+  /**
+   * 底部 Tab 栏容器：固定高度、整宽，内部胶囊按握持侧水平摆放。
+   *
+   * 这里不再把整宽自定义栏塞进 Tabs 的 tabBar（那样整条标签区域都会响应
+   * “点击切页”，点胶囊外面也会跳回工具箱），而是：
+   * - 内容用一条隐藏 TabBar 的 Tabs 负责滑动/页面切换；
+   * - 底部单独放一条 216vp 宽的“只为材质而生”的 Tabs（官方 barFloatingStyle +
+   *   systemMaterial），它只占胶囊本身的范围，点外面不会误触。
+   */
   @Builder
-  floatingNavBar() {
+  tabBarArea() {
     Row() {
-      this.floatingTabItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings'), $r('app.media.settings'))
-      this.floatingTabItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting'), $r('app.media.globalSetting'))
+      if (this.useOfficialBar()) {
+        this.officialBarTabs()
+      } else {
+        this.glassBar()
+      }
     }
     .width('100%')
-    .padding(6)
-    .borderRadius(32)
-    // 系统模糊材质层
-    .backgroundBlurStyle(BlurStyle.COMPONENT_THICK)
-    // 表面光感渐变（左上光源 -> 右下微暗角，与主页卡片同一光感配方）
+    .height(TAB_BAR_AREA_HEIGHT)
+    .onAreaChange((_oldValue: Area, newValue: Area) => {
+      const w = newValue.width as number;
+      if (w > 0 && Math.abs(w - this.barAreaWidth) > 1) {
+        this.barAreaWidth = w;
+      }
+    })
+    // 胶囊之外的区域不拦截内容区触摸
+    .hitTestBehavior(HitTestMode.Transparent)
+  }
+
+  /** 是否使用官方沉浸光感悬浮栏（API 26+、设备支持、且光感未关闭） */
+  private useOfficialBar(): boolean {
+    return this.lightSense > LightSense.LEVEL_OFF && LightSense.supportsSystemMaterial();
+  }
+
+  /**
+   * 官方沉浸光感悬浮栏：Tabs 宽 216vp，只显示底部 TabBar（内容为 0 高）。
+   * `barFloatingStyle.systemMaterial` 是官方明确支持底部页签的材质入口。
+   */
+  @Builder
+  officialBarTabs() {
+    Tabs({
+      barPosition: BarPosition.End,
+      controller: this.barTabsController,
+      index: this.currentIndex
+    }) {
+      TabContent() {
+        Row().width(0).height(0).backgroundColor(Color.Transparent)
+      }
+      .backgroundColor(Color.Transparent)
+      .tabBar(this.officialBarItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings')))
+
+      TabContent() {
+        Row().width(0).height(0).backgroundColor(Color.Transparent)
+      }
+      .backgroundColor(Color.Transparent)
+      .tabBar(this.officialBarItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting')))
+    }
+    .width(TAB_BAR_WIDTH)
+    .height(TAB_BAR_AREA_HEIGHT)
+    .barMode(BarMode.Fixed)
+    .barHeight(TAB_BAR_HEIGHT)
+    // 透明化 Tabs 自身背景与 TabBar 背板，否则 216×64 的 Tabs 盒子会在胶囊
+    // 周围露出一块直角白底（右侧/底部看起来像“直角边”）
+    .backgroundColor(Color.Transparent)
+    .barBackgroundColor(Color.Transparent)
+    .barBackgroundBlurStyle(BlurStyle.NONE)
+    // 悬浮样式要求：横向 + BarPosition.End + barOverlap(true)
+    .barOverlap(true)
+    .barFloatingStyle({
+      barWidth: {
+        smallBarWidth: TAB_BAR_WIDTH,
+        mediumBarWidth: TAB_BAR_WIDTH,
+        largeBarWidth: TAB_BAR_WIDTH
+      },
+      barSideMargin: 0,
+      barBottomMargin: 4,
+      // 关掉官方悬浮栏自带的底部渐变遮罩：它是一块直角矩形，
+      // 会在胶囊周围露出白色/灰色直角边（尤其设置壁纸后非常明显）
+      maskColor: Color.Transparent,
+      maskHeight: 0,
+      adaptToHandedness: false,
+      systemMaterial: LightSense.tabSystemMaterial(this.lightSense)
+    })
+    .margin({ left: this.tabBarLeftMargin() })
+    .onChange((index: number) => {
+      if (index !== this.currentIndex) {
+        this.currentIndex = index;
+        this.tabsController.changeIndex(index);
+      }
+    })
+  }
+
+  /** 官方栏里的单个入口（点击由 Tabs 自身处理，不再手动挂 onClick） */
+  @Builder
+  officialBarItem(index: number, title: Resource, icon: Resource) {
+    Row() {
+      if (this.currentIndex === index && this.lightSense > LightSense.LEVEL_OFF) {
+        // 选中态本身就是一块玻璃：官方毛玻璃 + 蓝色赋色 + 光感渐变 + 玻璃 rim。
+        // 不再依赖“在 TabBar 里再嵌一层 systemMaterial”（第二页签上会不生效），
+        // 手绘玻璃配方在所有页签、所有系统版本上表现一致。
+        Column({ space: 2 }) {
+          this.barItemContent(index, title, icon)
+        }
+        .width('96%')
+        .height(48)
+        .justifyContent(FlexAlign.Center)
+        .borderRadius(24)
+        // 小面积蓝色玻璃：backdropBlur 不带系统白色材质染色，
+        // 蓝色底 + 左上高光 + 白 rim，选中态才是“蓝玻璃”而不是白贴片
+        .backdropBlur(8)
+        .backgroundColor(this.isDark ? 'rgba(96, 165, 250, 0.16)' : 'rgba(10, 89, 247, 0.14)')
+        .linearGradient({
+          angle: 135,
+          colors: this.isDark ? [
+            ['rgba(255, 255, 255, 0.22)', 0.0],
+            ['rgba(96, 165, 250, 0.06)', 0.5],
+            ['rgba(96, 165, 250, 0.14)', 1.0]
+          ] : [
+            ['rgba(255, 255, 255, 0.55)', 0.0],
+            ['rgba(10, 89, 247, 0.04)', 0.5],
+            ['rgba(10, 89, 247, 0.12)', 1.0]
+          ]
+        })
+        .border({
+          width: 1,
+          color: this.isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.9)'
+        })
+        .shadow({
+          radius: 10,
+          color: ImmersiveStyles.tabSelectedGlow(this.isDark),
+          offsetX: 0,
+          offsetY: 0
+        })
+        .animation({ duration: 200, curve: Curve.EaseInOut })
+      } else {
+        Column({ space: 2 }) {
+          this.barItemContent(index, title, icon)
+        }
+        .width('96%')
+        .height(48)
+        .justifyContent(FlexAlign.Center)
+        .borderRadius(24)
+        .backgroundColor(this.currentIndex === index ? ImmersiveStyles.tabSelectedBg(this.isDark) : Color.Transparent)
+        .animation({ duration: 200, curve: Curve.EaseInOut })
+      }
+    }
+    .width('100%')
+    .height(48)
+    .justifyContent(FlexAlign.Center)
+  }
+
+  /** 图标 + 文字的公共内容（官方栏/手绘兜底栏共用） */
+  @Builder
+  barItemContent(index: number, title: Resource, icon: Resource) {
+    Image(icon)
+      .width(this.currentIndex === index ? 24 : 22)
+      .height(this.currentIndex === index ? 24 : 22)
+      .objectFit(ImageFit.Contain)
+      .animation({ duration: 200, curve: Curve.EaseInOut })
+
+    Text(title)
+      .fontSize(10)
+      .fontColor(this.currentIndex === index ? $r('sys.color.font_emphasize') : $r('sys.color.font_primary'))
+      .fontWeight(this.currentIndex === index ? FontWeight.Bold : FontWeight.Normal)
+      .animation({ duration: 200 })
+  }
+
+  /**
+   * 低版本 / 光感关闭时的兜底悬浮胶囊：
+   * 手绘玻璃配方（backgroundBlurStyle + 光感渐变 + rim + 点光源）。
+   */
+  @Builder
+  glassBar() {
+    Row() {
+      this.glassTabItem(TOOLS_TAB_INDEX, $r('app.string.tools_tab'), $r('app.media.settings'))
+      this.glassTabItem(SETTING_TAB_INDEX, $r('app.string.setting_tab'), $r('app.media.globalSetting'))
+    }
+    .width(TAB_BAR_WIDTH)
+    .height(TAB_BAR_HEIGHT)
+    .padding(4)
+    .borderRadius(TAB_BAR_HEIGHT / 2)
+    .clip(true)
+    .backgroundBlurStyle(ImmersiveStyles.tabBarBlurStyle())
+    .backgroundColor(ImmersiveStyles.tabBarBase(this.isDark))
     .linearGradient({
       angle: 135,
       colors: ImmersiveStyles.cardSurfaceColors(this.isDark)
     })
-    // 点光源光效（官方视觉特效，照亮边缘）
     .visualEffect(LightSense.lightVisualEffect())
-    // 外边缘受光（非对称 rim light，模拟折射衰减）
     .border({ width: 1, color: ImmersiveStyles.cardOuterRim(this.isDark) })
-    // 悬浮投影
     .shadow({
       radius: 20,
       color: ImmersiveStyles.cardShadow(this.isDark),
       offsetX: 0,
       offsetY: 8
     })
-    .margin({ left: 16, right: 16, bottom: '12vp' })
+    .margin({ left: this.tabBarLeftMargin(), top: (TAB_BAR_AREA_HEIGHT - TAB_BAR_HEIGHT) / 2 })
+    .animation({ duration: 260, curve: Curve.EaseInOut })
   }
 
   @Builder
-  floatingTabItem(index: number, title: Resource, selectedImg: Resource, normalImg: Resource) {
+  glassTabItem(index: number, title: Resource, icon: Resource) {
     Column({ space: 2 }) {
-      Image(this.currentIndex === index ? selectedImg : normalImg)
-        .width(this.currentIndex === index ? 24 : 22)
-        .height(this.currentIndex === index ? 24 : 22)
-        .objectFit(ImageFit.Contain)
-        .animation({ duration: 200, curve: Curve.EaseInOut })
-
-      Text(title)
-        .fontSize(10)
-        .fontColor(this.currentIndex === index ? $r('sys.color.font_emphasize') : $r('sys.color.font_primary'))
-        .fontWeight(this.currentIndex === index ? FontWeight.Bold : FontWeight.Normal)
-        .animation({ duration: 200 })
+      this.barItemContent(index, title, icon)
     }
     .layoutWeight(1)
-    .height(52)
+    .height(48)
     .justifyContent(FlexAlign.Center)
-    .borderRadius(26)
-    // 选中态：胶囊高亮 + 光晕
+    .borderRadius(24)
     .backgroundColor(this.currentIndex === index ? ImmersiveStyles.tabSelectedBg(this.isDark) : Color.Transparent)
     .shadow(this.currentIndex === index ?
       { radius: 12, color: ImmersiveStyles.tabSelectedGlow(this.isDark), offsetX: 0, offsetY: 0 } :
@@ -855,11 +1075,11 @@ export struct HomePage {
     .animation({ duration: 200, curve: Curve.EaseInOut })
     .onClick(() => {
       this.handleTabClick(index);
-      this.tabsController.changeIndex(this.currentIndex);
+      this.tabsController.changeIndex(index);
     })
   }
 
-  /** Tab 内容体（两个分支共用）：内容 + 壁纸透明背景 */
+  /** Tab 内容体（两个页签共用）：内容 + 壁纸透明背景 */
   @Builder
   tabContentBody(index: number) {
     Column() {
@@ -878,50 +1098,13 @@ export struct HomePage {
   }
 
   /**
-   * 官方 HDS 沉浸光感悬浮 Tab（系统版本 >= 6.1.0 / API 23）——始终使用系统组件。
-   * 顺序固定 [工具箱][设置]（不换序、不重排，保证点击/滑动切换可靠）；
-   * 单手握持仅启用系统原生 adaptToHandedness（支持的系统上悬浮栏自动贴近握持侧）。
+   * 主 Tab 容器：
+   * - 内容 Tabs 隐藏系统 TabBar，负责页面内容与左右滑动；
+   * - 底部叠加一条独立的小宽度 Tabs/胶囊，负责沉浸光感与点击；
+   * - 内容底部留 96vp，最后一行可以滚到胶囊上方。
    */
   @Builder
-  hdsTabsContent() {
-    HdsTabs({
-      controller: this.hdsTabsController,
-      index: this.currentIndex
-    }) {
-      TabContent() {
-        this.tabContentBody(TOOLS_TAB_INDEX)
-      }
-      .tabBar(BottomTabBarStyle.of($r('app.media.settings'), $r('app.string.tools_tab')))
-
-      TabContent() {
-        this.tabContentBody(SETTING_TAB_INDEX)
-      }
-      .tabBar(BottomTabBarStyle.of($r('app.media.globalSetting'), $r('app.string.setting_tab')))
-    }
-    .width('100%')
-    .height('100%')
-    // 悬浮样式（barWidth 数值、沉浸材质）需要 barOverlap(true) 才生效；
-    // 内容避让由各页面内部的底部 spacer 完成，保证最后一行可滚出悬浮栏
-    .barOverlap(true)
-    // 透明化 Tab 栏背景，避免悬浮栏容器在胶囊下方/周围渲染出白色底带
-    .barBackgroundColor(Color.Transparent)
-    // 悬浮栏布局：直接属性（随光感/握姿 @Local 变化热更新）
-    .vertical(false)
-    .barPosition(BarPosition.End)
-    .barHeight(56)
-    .barFloatingStyle(this.currentBarStyle())
-    .onTabBarClick((index: number) => {
-      // HdsTabs 自身处理点击切换，这里仅同步状态与连点彩蛋
-      this.handleTabClick(index);
-    })
-    .onChange((index: number) => {
-      this.currentIndex = index;
-    })
-  }
-
-  /** 降级方案：手绘悬浮胶囊（旧系统版本，无 HDS 系统悬浮栏可用） */
-  @Builder
-  legacyTabsContent() {
+  mainTabs() {
     Stack({ alignContent: Alignment.Bottom }) {
       Tabs({
         barPosition: BarPosition.End,
@@ -939,16 +1122,19 @@ export struct HomePage {
       }
       .width('100%')
       .height('100%')
-      // 隐藏系统 Tab 栏（悬浮导航覆盖其上）
       .barHeight(0)
       .barMode(BarMode.Fixed)
-      .onAnimationStart((index: number, targetIndex: number) => {
-        hilog.info(0x0000, 'index', index.toString());
-        this.currentIndex = targetIndex;
+      .onChange((index: number) => {
+        if (index !== this.currentIndex) {
+          this.currentIndex = index;
+          // 内容滑动时同步官方悬浮栏选中态
+          if (this.useOfficialBar()) {
+            this.barTabsController.changeIndex(index);
+          }
+        }
       })
 
-      // 沉浸光感悬浮导航胶囊
-      this.floatingNavBar()
+      this.tabBarArea()
     }
     .width('100%')
     .height('100%')
@@ -1193,10 +1379,6 @@ export struct HomePage {
             .padding({ left: '16vp', right: '16vp' })
           }
         }
-        if (this.supportImmersiveTabs) {
-          Row()
-            .height(140)
-        }
       }
       .alignItems(HorizontalAlign.Start)
       .width('100%')
@@ -1319,13 +1501,8 @@ export struct HomePage {
           .objectFit(ImageFit.Cover)
           .blur(WallpaperUtil.blurRadius(this.wallpaperBlur))
       }
-      // 官方 HDS 沉浸光感 Tab（系统 6.1.0+）：始终使用系统悬浮栏（顺序/宽度固定，
-      // 单手握持启用系统原生 adaptToHandedness）；旧系统降级为手绘悬浮胶囊
-      if (this.supportImmersiveTabs) {
-        this.hdsTabsContent()
-      } else {
-        this.legacyTabsContent()
-      }
+      // 底部悬浮 Tab 栏：固定短宽度 + 单手握持贴边（宽度不随握姿变化）
+      this.mainTabs()
       // 壁纸裁切浮层：置于最顶层
       if (this.showCrop) {
         this.cropOverlay()
@@ -1343,13 +1520,13 @@ export struct HomePage {
           GridItem() {
               // 沉浸光感多层结构：毛玻璃基底 -> 光感渐变 -> 内容
               Stack() {
-                // 图层1：毛玻璃基底
+                // 图层1：毛玻璃基底（官方 backgroundBlurStyle 兜底，低版本可用）
                 Stack()
                   .width('100%')
                   .height('100%')
                   .borderRadius(ImmersiveStyles.cardRadius())
                   .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
-                  .backdropBlur(ImmersiveStyles.cardBlurRadius())
+                  .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle(), { colorMode: ThemeColorMode.SYSTEM })
 
                 // 图层2：表面光感渐变（左上光源 -> 右下微暗角）
                 Stack()
@@ -1456,12 +1633,12 @@ export struct HomePage {
       .columnsGap(8)
       .rowsGap(8)
       .columnsTemplate('1fr 1fr 1fr')
-      // 底部预留悬浮 Tab 栏避让空间（HDS 分支），最后一排卡片可滚动到悬浮栏上方
+      // 底部预留悬浮 Tab 栏避让空间，最后一排卡片可滚动到悬浮栏上方
       .padding({
         left: 12,
         right: 12,
         top: 12,
-        bottom: this.supportImmersiveTabs ? 116 : 12
+        bottom: 12
       })
       .edgeEffect(EdgeEffect.Spring)
       // [Pad大屏适配]
@@ -1479,13 +1656,13 @@ export struct HomePage {
 export function pixelMapBuilder(dragModel: DragCardModel, isDark: boolean) {
   // 沉浸光感四层结构：与网格卡片一致的毛玻璃 + 光感渐变 + 边缘高光
   Stack() {
-    // 图层1：毛玻璃基底
+    // 图层1：毛玻璃基底（官方 backgroundBlurStyle 兜底，低版本可用）
     Stack()
       .width('100%')
       .height('100%')
       .borderRadius(ImmersiveStyles.cardRadius())
       .backgroundColor(ImmersiveStyles.cardBase(isDark))
-      .backdropBlur(ImmersiveStyles.cardBlurRadius())
+      .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle(), { colorMode: ThemeColorMode.SYSTEM })
 
     // 图层2：表面光感渐变（左上光源 -> 右下微暗角）
     Stack()

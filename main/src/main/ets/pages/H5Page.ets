@@ -409,7 +409,8 @@ export struct H5Page {
         .width('100%')
         .padding(16)
         .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
-        .backdropBlur(ImmersiveStyles.cardBlurRadius())
+        // 官方毛玻璃兜底：随光感档位/深浅色模式切换
+        .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle(), { colorMode: ThemeColorMode.SYSTEM })
         .borderRadius(12)
         .border({ width: 1, color: ImmersiveStyles.cardOuterRim(this.isDark) })
         .clip(true)

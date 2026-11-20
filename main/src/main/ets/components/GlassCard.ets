@@ -6,7 +6,11 @@ import { LightSense } from '../utils/LightSense';
  * 沉浸光感玻璃卡片 —— 全项目**唯一**的卡片实现。
  *
  * 配方（顺序不可改，与工具箱卡片/设置分组完全一致）：
- *   基底色 → 毛玻璃 backdropBlur → 光感渐变 → rim 亮边 → 点光源 → 柔和投影
+ *   基底色 → 官方毛玻璃 backgroundBlurStyle → 光感渐变 → rim 亮边 → 点光源 → 柔和投影
+ *
+ * 为什么用 backgroundBlurStyle 而不是 backdropBlur：官方文档推荐的兜底方案是
+ * backgroundBlurStyle（跟随系统深浅色/算力档位），backdropBlur 只是裸模糊半径，
+ * 在低算力设备上更容易掉帧；两者不要叠加使用。
  *
  * 设计约束：
  * - 玻璃样式直接作用于**内容容器**（单节点）：内容决定高度，
@@ -52,7 +56,8 @@ export struct GlassCard {
     .borderRadius(ImmersiveStyles.cardRadius())
     .clip(true)
     .backgroundColor(ImmersiveStyles.cardBase(this.isDark))
-    .backdropBlur(ImmersiveStyles.cardBlurRadius())
+    // 官方毛玻璃兜底：低版本同样可用，按光感档位切换薄/常规/通透
+    .backgroundBlurStyle(ImmersiveStyles.cardBlurStyle(), { colorMode: ThemeColorMode.SYSTEM })
     .linearGradient({
       angle: 135,
       colors: ImmersiveStyles.cardSurfaceColors(this.isDark)

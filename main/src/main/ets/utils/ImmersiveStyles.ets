@@ -4,6 +4,13 @@
  * 核心思路：通过「毛玻璃基底 + 表面光感渐变 + 边缘高光 + 柔和投影」四层
  * 模拟光在材质表面的折射与漫反射，并按系统深/浅色模式提供两套参数，
  * 保证深色模式下不出现浅色玻璃发白发灰、浅色模式下不出现死黑脏边的问题。
+ *
+ * 官方 API 使用边界（重要）：
+ * - `systemMaterial`（API 26）只对「Navigation/NavDestination 标题栏」或
+ *   「横向 Tabs + BarPosition.End 的底部 TabBar」生效；页面内容区的卡片
+ *   不在生效范围内，因此卡片继续使用官方推荐的兜底方案
+ *   `backgroundBlurStyle` + backgroundColor/border/shadow，而不是硬套材质。
+ * - `hdsEffect`（API 20）统一由 LightSense 做版本/能力保护，本文件不直接引用。
  */
 import { LightSense } from './LightSense';
 
@@ -21,17 +28,26 @@ export class ImmersiveStyles {
       return isDark ? 'rgba(28, 28, 32, 0.94)' : 'rgba(255, 255, 255, 0.94)';
     }
     if (lv <= LightSense.LEVEL_GENTLE) {
-      return isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.15)';
+      return isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.16)';
     }
     if (lv <= LightSense.LEVEL_SMOOTH) {
       return isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.20)';
     }
-    return isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(255, 255, 255, 0.16)';
+    // 精致档：玻璃最通透，靠 backgroundBlurStyle(COMPONENT_THIN) + rim + 点光源出效果；
+    // 不能再降到 0.06 以下，否则在花哨壁纸上会变成"没有卡片"。
+    return isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.16)';
   }
 
   /** 卡片表面光感渐变：左上角光源高光 -> 中间通透 -> 右下角微暗角（高光保持半透明，背景透出） */
   static cardSurfaceColors(isDark: boolean): Array<[ResourceColor, number]> {
     const lv = LightSense.getLevel();
+    if (lv <= LightSense.LEVEL_OFF) {
+      // 关闭档：不叠加任何光感渐变，保持纯色平面
+      return [
+        ['rgba(255, 255, 255, 0)', 0.0],
+        ['rgba(255, 255, 255, 0)', 1.0]
+      ]
+    }
     if (lv <= LightSense.LEVEL_GENTLE) {
       if (isDark) {
         return [
@@ -65,44 +81,29 @@ export class ImmersiveStyles {
     ]
   }
 
-  /** 卡片柔和投影：浅色模式阴影极淡（社区建议 rgba(0,0,0,0.12) 级别），深色模式加深保证悬浮感 */
+  /** 卡片柔和投影：浅色模式阴影极淡，深色模式加深保证悬浮感；关闭档再收敛 */
   static cardShadow(isDark: boolean): string {
+    if (LightSense.getLevel() <= LightSense.LEVEL_OFF) {
+      return isDark ? 'rgba(0, 0, 0, 0.28)' : 'rgba(0, 0, 0, 0.06)';
+    }
     return isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.1)';
   }
 
   /**
-   * 卡片背景模糊半径（vp，按全局光感档位取值）：光感是"通透+边缘折射"而非磨砂，
-   * 精致档系统材质承担玻璃感，故模糊降到 0；低档位保留极薄模糊兜底。
+   * 卡片模糊档位（backgroundBlurStyle 用）。
+   * 这是官方推荐的、低版本也可用的材质兜底；0 档为 NONE，其余档位始终有模糊。
    */
-  static cardBlurRadius(): number {
-    const lv = LightSense.getLevel();
-    if (lv <= LightSense.LEVEL_OFF) {
-      return 0;
-    }
-    if (lv <= LightSense.LEVEL_GENTLE) {
-      return 4;
-    }
-    if (lv <= LightSense.LEVEL_SMOOTH) {
-      return 8;
-    }
-    return 0;
-  }
-
-  /** 卡片模糊档位（backgroundBlurStyle 用）：精致档为 NONE（玻璃感由点光源/亮边承担） */
   static cardBlurStyle(): BlurStyle {
-    const lv = LightSense.getLevel();
-    if (lv <= LightSense.LEVEL_OFF) {
-      return BlurStyle.NONE;
-    }
-    if (lv <= LightSense.LEVEL_SMOOTH) {
-      return BlurStyle.COMPONENT_THIN;
-    }
-    return BlurStyle.NONE;
+    return LightSense.cardBlurStyle(LightSense.getLevel());
   }
 
-  /** 卡片边缘亮边宽度（vp）：精致档加粗，折射光感更明显 */
+  /** 卡片边缘亮边宽度（vp）：精致档加粗，折射光感更明显；关闭档仅保留发丝边 */
   static cardRimWidth(): number {
-    return LightSense.getLevel() >= LightSense.LEVEL_EXQUISITE ? 1.5 : 1;
+    const lv = LightSense.getLevel();
+    if (lv <= LightSense.LEVEL_OFF) {
+      return 1;
+    }
+    return lv >= LightSense.LEVEL_EXQUISITE ? 1.5 : 1;
   }
 
   /** 卡片圆角 */
@@ -113,6 +114,12 @@ export class ImmersiveStyles {
   /** 外边缘受光（非对称 rim light）：上/左受光强、下/右衰减，模拟光源折射（单层，避免双描边） */
   static cardOuterRim(isDark: boolean): EdgeColors {
     const lv = LightSense.getLevel();
+    if (lv <= LightSense.LEVEL_OFF) {
+      // 关闭档：不要白色亮边，用一层极淡的分隔色即可
+      return isDark
+        ? { top: 'rgba(255, 255, 255, 0.08)', left: 'rgba(255, 255, 255, 0.06)', right: 'rgba(255, 255, 255, 0.05)', bottom: 'rgba(255, 255, 255, 0.04)' }
+        : { top: 'rgba(0, 0, 0, 0.06)', left: 'rgba(0, 0, 0, 0.05)', right: 'rgba(0, 0, 0, 0.04)', bottom: 'rgba(0, 0, 0, 0.03)' };
+    }
     if (lv >= LightSense.LEVEL_EXQUISITE) {
       // 精致：强折射亮边
       if (isDark) {
@@ -205,9 +212,23 @@ export class ImmersiveStyles {
 
   // ===================== 底部 Tab 栏 =====================
 
-  /** Tab 栏毛玻璃基底色：可读性优先，透明度比卡片更高（悬浮胶囊改用系统模糊材质 backgroundBlurStyle，此处保留备用） */
+  /** Tab 栏毛玻璃兜底基底色（API < 26 或全局光感关闭时使用） */
   static tabBarBase(isDark: boolean): string {
-    return isDark ? 'rgba(24, 24, 27, 0.8)' : 'rgba(255, 255, 255, 0.88)';
+    const lv = LightSense.getLevel();
+    if (lv <= LightSense.LEVEL_OFF) {
+      return isDark ? 'rgba(28, 28, 32, 0.96)' : 'rgba(255, 255, 255, 0.96)';
+    }
+    // 悬浮胶囊保持半透明：背景内容透出才是"沉浸光感"；可读性由毛玻璃 + 文字阴影兜底
+    return isDark ? 'rgba(24, 24, 27, 0.55)' : 'rgba(255, 255, 255, 0.55)';
+  }
+
+  /** Tab 栏兜底毛玻璃档位：官方建议底部页签用较薄的材质 */
+  static tabBarBlurStyle(): BlurStyle {
+    const lv = LightSense.getLevel();
+    if (lv <= LightSense.LEVEL_OFF) {
+      return BlurStyle.NONE;
+    }
+    return BlurStyle.COMPONENT_THIN;
   }
 
   /** Tab 选中项光晕颜色 */
