@@ -1,4 +1,4 @@
-﻿# CMakeLists.txt — supertools HDC native library
+# CMakeLists.txt — supertools HDC native library
 cmake_minimum_required(VERSION 3.5.0)
 project(hdc_native)
 
@@ -37,3 +37,4 @@ include_directories(
 )
 
 add_subdirectory(hdctools)
+add_subdirectory(game)

@@ -7,6 +7,7 @@
     "pages/RouterMainPage",
     "pages/AdsKitPage",
     "pages/AdsHspPage",
+    "pages/GameBannerPage",
     "pages/FloatBallPage",
     "capabilities/floatingclock/FloatClockPage",
     "capabilities/floatingstress/StressCapsulePage"

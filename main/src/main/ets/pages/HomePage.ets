@@ -71,7 +71,11 @@ export struct HomePage {
   @Local isAdsKitVisible: boolean = false;
   /** Router 测试入口：默认隐藏，设置页连点彩蛋解锁后持久显示 */
   @Local isRouterDemoVisible: boolean = false;
+  /** 模拟游戏入口：默认隐藏，设置页连点彩蛋解锁后持久显示 */
+  @Local isGameVisible: boolean = false;
   private adsKitPushInProgress: boolean = false;
+  /** 模拟游戏页跳转中：防止快速连点把同一个页面压入多次 */
+  private gamePushInProgress: boolean = false;
   /** Router 演示页跳转中：防止快速连点把同一个 router 页面压入多次 */
   private routerDemoPushInProgress: boolean = false;
   // 沉浸光感：跟随系统深/浅色模式
@@ -195,6 +199,18 @@ export struct HomePage {
       setTimeout(() => { this.adsKitPushInProgress = false; }, 500);
     }
   }
+,
+  {
+    name: '模拟游戏',
+    desc: '原生 GL 三消，验证游戏广告变现',
+    icon: $r('app.media.game_match3'),
+    onClick: () => {
+      if (this.gamePushInProgress) { return; }
+      this.gamePushInProgress = true;
+      HMRouterMgr.push({ pageUrl: PageNames.GAME_DEMO_PAGE });
+      setTimeout(() => { this.gamePushInProgress = false; }, 500);
+    }
+  }
   ];
   @Local itemData: DragCardModel = new DragCardModel();
   // 内容区壁纸 PixelMap：盖住 NavDestination 的白底（Index 根级壁纸负责状态栏区域）
@@ -252,6 +268,8 @@ export struct HomePage {
     this.isAdsKitVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_ADS_KIT_VISIBLE, false);
     // Router 测试入口同样默认隐藏，需要通过设置页连点彩蛋手动解锁
     this.isRouterDemoVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_ROUTER_DEMO_VISIBLE, false);
+    // 模拟游戏入口：dev 默认可见便于联调；AG 上架版默认隐藏，靠连点彩蛋解锁
+    this.isGameVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_GAME_DEMO_VISIBLE, !TargetConstants.IS_AG_TARGET);
     // 设备信息：default / dev 两个 target 均默认可见
     this.listData.push({
       name: '设备信息',
@@ -789,10 +807,12 @@ export struct HomePage {
       PreferencesUtil.put(SpKeys.ENABLE_HDC_VISIBLE, true);
       PreferencesUtil.put(SpKeys.ENABLE_ADS_KIT_VISIBLE, true);
       PreferencesUtil.put(SpKeys.ENABLE_ROUTER_DEMO_VISIBLE, true);
+      PreferencesUtil.put(SpKeys.ENABLE_GAME_DEMO_VISIBLE, true);
       this.isHdcVisible = true;
       this.isAdsKitVisible = true;
       this.isRouterDemoVisible = true;
-      promptAction.showToast({ message: '扫码解析 + HDC调试 + AdsKit + Router测试已启用', duration: 1500 });
+      this.isGameVisible = true;
+      promptAction.showToast({ message: '扫码解析 + HDC调试 + AdsKit + Router + 模拟游戏已启用', duration: 1500 });
       this.settingsClickCount = 0;
     }
   }
@@ -802,6 +822,7 @@ export struct HomePage {
     return this.listData.filter((item: ToolCardItem) =>
       !(item.name === 'HDC 调试' && !this.isHdcVisible) &&
       !(item.name === 'Router 页面跳转' && !this.isRouterDemoVisible) &&
+      !(item.name === '模拟游戏' && !this.isGameVisible) &&
       !((item.name === 'AdsKit广告测试' || item.name === 'Ads Hsp广告') && !this.isAdsKitVisible));
   }
 

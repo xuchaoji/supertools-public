@@ -112,6 +112,7 @@ supertools-public/
         │   │   ├── utils/          # 9 个工具/服务类
         │   │   ├── model/          # 5 个数据模型 (2 个为空桩文件)
         │   │   ├── viewmodel/      # 2 个 ViewModel 单例
+        │   │   ├── game/           # 模拟游戏：三消逻辑/状态机/广告服务/帧缓冲
         │   │   ├── constant/       # 3 个常量文件
         │   │   ├── capabilities/   # 2 个独立功能模块
         │   │   └── workers/        # 2 个 ThreadWorker 脚本
@@ -157,6 +158,7 @@ supertools-public/
 | `pages/GuidePage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 隐私协议同意引导页 |
 | `pages/PrivacyPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 隐私政策 WebView 展示 |
 | `pages/HomePage.ets` | `@ComponentV2` + `@HMRouter` | 路由装饰器 | 主面板 (工具网格 + 设置页) |
+| `pages/GameDemoPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 模拟游戏（原生 GL 三消 + 游戏广告测试宿主，见 §6.16） |
 | `pages/CalcPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | CPU 压测工具页 |
 | `pages/ScreenRecordPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 屏幕录制页 |
 | `pages/LocalWebPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 本地 Web 服务管理 |
@@ -1143,6 +1145,54 @@ main/src/main/cpp/types/libhdc_z/Index.d.ts
 - 底部白条不一定是系统导航条：先检查页面底部 padding 区域有没有底色（见 §5.7 坑 3）。
 - `targetSdkVersion` 写 `26.0.0`，不能写 `26.0.0(26)`（hvigor `ApiVersion` 解析会报 `api version parameter is illegal`）。
 - 在 TabBar 里再嵌一层 `systemMaterial` 做选中胶囊不可靠（第二个页签上可能不生效），统一用 overlay 的手绘滑动胶囊。
+
+### 6.16 原生整屏游戏（模拟游戏入口，2026-11）
+
+工具箱「模拟游戏」入口是一个**整屏原生渲染**的三消 demo，用来验证游戏场景下的广告变现
+（开屏/激励/插屏/横幅）。设计细节与验证记录见
+`docs/superpowers/specs/2026-11-21-native-gl-game-demo.md`。
+
+**目标不是"能玩"，而是"像游戏"**：开启开发者选项的「显示布局边界」后，整屏应当只有一个
+Surface，HUD、按钮、弹窗、调试面板都不能是 ArkUI 控件。
+
+**结构**：
+
+| 层 | 文件 | 职责 |
+|---|---|---|
+| 页面 | `pages/GameDemoPage.ets` | 只放一个全屏 XComponent；显示列表、命中测试、广告调度、帧循环 |
+| 逻辑 | `game/BoardModel.ets` | 8×8/5 色、无初始三连、有效步检测、下落补齐、死局洗牌（纯函数） |
+| 状态机 | `game/GameEngine.ets` | IDLE/SWAPPING/RESOLVING/PAUSED/WIN/LOSE、动画时间线、棋盘帧装配 |
+| UI | `game/GameUi.ets` | UI 显示列表（归一化矩形 + 文本） |
+| 广告 | `game/GameAdService.ets` | 激励/插屏/开屏 + Mock 兜底 |
+| 横幅 | `pages/GameBannerPage.ets` + `WindowStageHolder` | 横幅广告放独立子窗口，不进游戏布局树 |
+| 原生 | `cpp/game/` | `libgame.so`：GL 画棋盘 + OH_Drawing 画 UI 纹理 + 原生触摸 |
+
+**必须知道的 8 个坑**：
+
+1. **`@Entry` 的 build 根必须是容器**，不能直接返回 XComponent；包一层 `Stack` 即可。
+2. **SURFACE 类型的 XComponent 收不到 ArkTS `.onTouch`**，输入必须走原生
+   `DispatchTouchEvent` + 每帧 `pollTouch()` 轮询；按钮命中测试在 ArkTS 做。
+3. **UI 也走原生**：`OH_Drawing_Typography` 画中文，`DrawRoundRect` 画卡片/按钮；
+   每帧先画所有矩形再画所有文本，所以**弹窗/面板打开时不要再画底层 HUD**，
+   否则半透明遮罩盖不住底层文本。
+4. **OH_Drawing 要链接 `libnative_drawing.so`**，否则大量 undefined symbol。
+5. **UI 纹理懒创建的鸡生蛋**：先判断 texture 是否为空再 return 会导致永远不创建；
+   必须先 `RenderUi` 再判断。
+6. **`@Builder` 按值参数不刷新、`@Trace` 在嵌套 builder 里不建立依赖**（见 §6.13）。
+   整屏原生 UI 不依赖 ArkUI 响应式，改为每帧比较 UI key、变化时重建显示列表。
+7. **`window.Window` 没有 hide API**；子窗口"隐藏"用 `moveWindowTo` 移到屏幕外。
+8. **尺寸用 `getSurfaceSize()`** 拿实际像素再换算 vp，不要依赖 ArkTS `onAreaChange`
+   （本机 XComponent 上不触发）。
+
+**入口可见性**：dev target 默认可见；AG（`IS_AG_TARGET`）默认隐藏，与 AdsKit/Router/HDC 一样
+靠「设置页 5 秒内连点 8 次」解锁（`SpKeys.ENABLE_GAME_DEMO_VISIBLE`）。
+
+**状态栏与图标**：游戏页进入时用 `setWindowSystemBarProperties({ statusBarColor: '#07090F',
+statusBarContentColor: '#FFFFFF' })` 把状态栏切成深色 + 白图标，退出时恢复；入口图标放在
+`AppScope/resources/base/media/game_match3.svg`，与其它工具图标统一为 `#7B68EE` 描边 +
+`#FF4500` 点缀的线性风格。
+
+---
 
 ## 7. 构建系统
 

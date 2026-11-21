@@ -43,4 +43,6 @@ export class SpKeys {
   public static readonly ENABLE_ADS_KIT_VISIBLE: string = 'enable_ads_kit_visible';
   /** Router 测试入口是否已通过设置页连点解锁（默认隐藏）。 */
   public static readonly ENABLE_ROUTER_DEMO_VISIBLE: string = 'enable_router_demo_visible';
+  /** 模拟游戏入口是否已通过设置页连点解锁（默认隐藏）。 */
+  public static readonly ENABLE_GAME_DEMO_VISIBLE: string = 'enable_game_demo_visible';
 }

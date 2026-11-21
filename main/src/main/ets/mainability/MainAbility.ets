@@ -11,6 +11,7 @@ import { CommonViewModel } from '../viewmodel/CommonViewModel';
 import { FloatClockManager } from '../capabilities/floatingclock/FloatClockManager';
 import { StressFloatWindowManager } from '../capabilities/floatingstress/StressWindowManager';
 import { WebServerUtil } from '../utils/WebServerUtil';
+import { WindowStageHolder } from '../utils/WindowStageHolder';
 import advertising from '@hw-ads/ads';
 import { TargetConstants } from 'main/ets/TargetConstants';
 
@@ -135,6 +136,8 @@ export default class MainAbility extends UIAbility {
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
+    // 存一份 WindowStage：游戏页要用它创建横幅广告子窗口
+    WindowStageHolder.set(windowStage);
     // Main window is created, set main page for this ability
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onWindowStageCreate');
 

@@ -14,6 +14,8 @@ export class PageNames {
   public static readonly QR_CODE_PAGE = 'qrCodePage';
   public static readonly ADS_KIT_PAGE: string = 'adsKitPage';
   public static readonly ADS_HSP_PAGE: string = 'adsHspPage';
+  /** 模拟游戏（原生 GL 渲染的三消），用于游戏广告变现场景测试 */
+  public static readonly GAME_DEMO_PAGE: string = 'gameDemoPage';
 
   // ===================== 系统 router 页面 =====================
   // 与上面的 HMRouter pageUrl 不同：这里必须是真正注册在
