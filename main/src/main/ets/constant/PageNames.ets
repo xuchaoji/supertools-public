@@ -6,6 +6,8 @@ export class PageNames {
   public static readonly SCREEN_RECORD: string = 'ScreenRecordPage';
   public static readonly CALC_PAGE = 'calcPage';
   public static readonly STR_CONVERT = 'stringConvertPage';
+  /** Markdown 笔记（功能 UI 与存储都在 notes_hsp 中） */
+  public static readonly MARKDOWN_NOTES_PAGE = 'markdownNotesPage';
   public static readonly LOCAL_WEB_PAGE = 'localWebPage';
   public static readonly DEVICE_INFO_PAGE = 'deviceInfoPage';
   public static readonly APP_LINKING_TOOL = 'appLinkingTool';

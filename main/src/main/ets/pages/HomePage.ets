@@ -146,6 +146,15 @@ export struct HomePage {
     }
     ,
     {
+      name: 'Markdown',
+      desc: 'Markdown 编辑、预览与本地保存',
+      icon: $r('app.media.markdown_notes'),
+      onClick: () => {
+        HMRouterMgr.push({ pageUrl: PageNames.MARKDOWN_NOTES_PAGE })
+      }
+    }
+    ,
+    {
       name: '二维码生成',
       desc: '文本生成二维码，支持保存相册',
       icon: $r('app.media.qr_code'),
@@ -258,6 +267,15 @@ export struct HomePage {
   private wallpaperLayerY: number = 0;
 
   aboutToAppear(): void {
+    // 开发者入口显隐策略版本 2：Router / AdsKit / Ads Hsp / 模拟游戏默认隐藏。
+    // 一次性清理历史版本遗留的解锁标记，避免老用户升级后仍然看到这些入口；
+    // 清理后用户仍可通过「设置页 5 秒内连点 8 次」重新解锁，解锁状态会继续持久化。
+    if (PreferencesUtil.getNumberSync(SpKeys.DEV_ENTRY_VISIBILITY_VERSION, 0) < 2) {
+      PreferencesUtil.putSync(SpKeys.ENABLE_ADS_KIT_VISIBLE, false);
+      PreferencesUtil.putSync(SpKeys.ENABLE_ROUTER_DEMO_VISIBLE, false);
+      PreferencesUtil.putSync(SpKeys.ENABLE_GAME_DEMO_VISIBLE, false);
+      PreferencesUtil.putSync(SpKeys.DEV_ENTRY_VISIBILITY_VERSION, 2);
+    }
     // HDC 调试入口可见性：
     //   dev  —— 默认可见
     //   AG   —— 默认隐藏，需「设置页连点彩蛋」写入 ENABLE_HDC_VISIBLE 后出现
@@ -268,8 +286,8 @@ export struct HomePage {
     this.isAdsKitVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_ADS_KIT_VISIBLE, false);
     // Router 测试入口同样默认隐藏，需要通过设置页连点彩蛋手动解锁
     this.isRouterDemoVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_ROUTER_DEMO_VISIBLE, false);
-    // 模拟游戏入口：dev 默认可见便于联调；AG 上架版默认隐藏，靠连点彩蛋解锁
-    this.isGameVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_GAME_DEMO_VISIBLE, !TargetConstants.IS_AG_TARGET);
+    // 模拟游戏入口：所有 target 默认隐藏，靠设置页连点彩蛋解锁
+    this.isGameVisible = PreferencesUtil.getBooleanSync(SpKeys.ENABLE_GAME_DEMO_VISIBLE, false);
     // 设备信息：default / dev 两个 target 均默认可见
     this.listData.push({
       name: '设备信息',
@@ -459,7 +477,7 @@ export struct HomePage {
   /** 订阅系统深/浅色模式变化，驱动沉浸光感参数切换 */
   private initThemeListener(): void {
     try {
-      this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(display-mode: dark)');
+      this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(dark-mode: true)');
       this.isDark = this.themeMq.matches;
       this.themeMq.on('change', (event: mediaquery.MediaQueryResult) => {
         this.isDark = event.matches;

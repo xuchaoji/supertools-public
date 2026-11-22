@@ -3,8 +3,8 @@
   "app": {
     "bundleName": "com.xuchaoji.hmos.supertools",
     "vendor": "xuchaoji",
-    "versionCode": 3000000,
-    "versionName": "3.0.0",
+    "versionCode": 3000001,
+    "versionName": "3.0.1",
     "icon": "$media:layered_icon",
     "label": "$string:app_name"
   }

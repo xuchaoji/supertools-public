@@ -52,6 +52,13 @@
         ],
       }
     ],
+    "metadata": [
+      {
+        // 应用级开启官方沉浸光感：Dialog/Toast 等官方支持的组件会自动带上系统材质。
+        "name": "ohos.arkui.UIMaterial.state",
+        "value": "enable"
+      }
+    ],
     "requestPermissions": [
       {
         "name": "ohos.permission.APP_TRACKING_CONSENT",

@@ -84,7 +84,7 @@ export struct LocalWebPage {
   aboutToAppear(): void {
     this.safeBottom = SafeArea.bottom();
     try {
-      this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(display-mode: dark)');
+      this.themeMq = this.getUIContext().getMediaQuery().matchMediaSync('(dark-mode: true)');
       this.isDark = this.themeMq.matches;
       this.themeMq.on('change', (event: mediaquery.MediaQueryResult) => {
         this.isDark = event.matches;

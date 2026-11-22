@@ -10,7 +10,7 @@
 |---|---|
 | 项目名 | supertools-public |
 | 应用 ID | `com.xuchaoji.hmos.supertools` |
-| 版本 | 3.0.0 (versionCode: 3000000) |
+| 版本 | 3.0.1 (versionCode: 3000001) |
 | 平台 | HarmonyOS 5.0+（targetSdkVersion 26.0.0，兼容 5.0.5） |
 | SDK 版本 | 编译/目标 API 26.0.0(26)；compatibleSdkVersion 5.0.5(17) |
 | 目标设备 | phone, tablet, 2in1 |
@@ -21,6 +21,7 @@
 
 **主要功能模块：**
 - 设备高负载模拟器 / 压测工具 (CPU 多 Worker 线程斐波那契计算 + StressWorker 百分比强度控制)
+- **Markdown 笔记**（`notes_hsp` HSP：本地文件存储 + `@luvi/lv-markdown-in` 原生渲染，见 §16）
 - 屏幕录制 (H.264/H.265 编码，可选麦克风，后台保活，自动保存到图库)
 - 悬浮时钟 (`capabilities/floatingclock/`，毫秒级实时显示)
 - 悬浮压测小窗 (`capabilities/floatingstress/`，CPU/MEM 实时圆环监控 + 强度滑动调节)
@@ -42,6 +43,7 @@
 | 工具库 | `@pura/harmony-utils` (AppUtil, PreferencesUtil, ToastUtil, DialogUtil, DateUtil, FileUtil) |
 | 文件/图片选择 | `@pura/picker_utils` (PhotoHelper) |
 | 路由转场 | `@hadss/hmrouter-transitions` |
+| Markdown 渲染 | `@luvi/lv-markdown-in`（3.4.6，MIT；仅在 `notes_hsp` 中依赖） |
 | 测试 (声明但无测试) | `@ohos/hypium` (1.0.21), `@ohos/hamock` (1.0.0) |
 | 运行时 | HarmonyOS only, 严格模式 |
 
@@ -81,7 +83,7 @@ import { PhotoHelper } from '@pura/picker_utils';
 ```
 supertools-public/
 ├── AppScope/                       # 应用级全局配置
-│   ├── app.json5                   # 应用清单 (bundleName, versionCode 2000002)
+│   ├── app.json5                   # 应用清单 (bundleName, versionCode 3000001)
 │   └── resources/                  # 全局 i18n 资源
 ├── hvigorfile.ts                   # 根构建入口 (appTasks + hmrouter appPlugin)
 ├── hvigor/hvigor-config.json5      # Hvigor 构建配置 (daemon/parallel/logging)
@@ -94,7 +96,8 @@ supertools-public/
 ├── docs/
 │   └── knowledge-base.md           # 本知识库
 ├── oh_modules/                     # ohpm 安装的依赖
-└── main/                           # [唯一模块] 主入口模块
+├── notes_hsp/                      # Markdown 笔记 HSP（完整 UI + 存储 + Markdown SDK，见 §16）
+└── main/                           # [唯一 entry HAP] 主入口模块
     ├── hvigorfile.ts               # 模块构建入口 (hapTasks + 自定义 removePermissionPlugin)
     ├── build-profile.json5         # 模块构建配置 (targets + workers 注册)
     ├── oh-package.json5            # 模块级依赖 (当前为空)
@@ -143,7 +146,7 @@ supertools-public/
 > **重要**: 通过 `@HMRouter` 注册的页面**不需要**在 `main_pages.json` 中额外注册。仅系统浮窗页面（TYPE_FLOAT window）与**系统 `router` 页面**必须在此注册。
 >
 > `pages/RouterDemoPage` / `pages/RouterDemoDetailPage` / `pages/RouterSplashPage` / `pages/RouterMainPage` 是故意保留的**系统 router 演示页**：工具箱「Router 页面跳转」入口用 `router.pushUrl` 进入，与 HMRouter 的 NavPathStack 互不影响，用于演示两套路由栈共存。其中「模拟应用打开」会进入开屏页，5 秒后 `router.replaceUrl` 到模拟主页（开屏页不留在栈内）。
-> **入口默认隐藏**：需要「设置页连点彩蛋」（5 秒内在设置 tab 连点 8 次）写入 `ENABLE_ROUTER_DEMO_VISIBLE` 后才出现。
+> **开发者入口默认隐藏**：`Router 页面跳转`、`AdsKit广告测试`、`Ads Hsp广告`、`模拟游戏`四个入口默认不展示；需要「设置页连点彩蛋」（5 秒内在设置 tab 连点 8 次）才会出现。彩蛋解锁状态会持久化，但 `DEV_ENTRY_VISIBILITY_VERSION` 首次升级到 2 时会一次性清理旧版本遗留的解锁标记。
 
 **页面清单 (完整)：**
 
@@ -159,6 +162,7 @@ supertools-public/
 | `pages/PrivacyPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 隐私政策 WebView 展示 |
 | `pages/HomePage.ets` | `@ComponentV2` + `@HMRouter` | 路由装饰器 | 主面板 (工具网格 + 设置页) |
 | `pages/GameDemoPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 模拟游戏（原生 GL 三消 + 游戏广告测试宿主，见 §6.16） |
+| `pages/MarkdownNotesPage.ets` | `@ComponentV2` + `@HMRouter` | 路由装饰器 | Markdown 笔记宿主壳（功能在 `notes_hsp`，见 §16） |
 | `pages/CalcPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | CPU 压测工具页 |
 | `pages/ScreenRecordPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 屏幕录制页 |
 | `pages/LocalWebPage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 本地 Web 服务管理 |
@@ -404,6 +408,22 @@ hdc shell "uitest dumpLayout -p /data/local/tmp/l.xml"  # 看元素 bounds 是�
 
 ### 5.8 样式契约（新建/改造子页面必须遵守）
 
+#### 5.8.0 强制要求：不得伪造系统材质（2026-11-22）
+
+> 这条是硬约束，新增页面、组件、重构都必须遵守。违反的代码不得合入。
+
+1. **先确认生效范围**：`systemMaterial` / `uiMaterial.ImmersiveMaterial` 只在官方支持的容器生效——Navigation/NavDestination 标题栏、横向 Tabs 中 `barPosition: BarPosition.End` 的底部 TabBar、Dialog/Toast/Sheet/Menu/Popup 等。普通页面内容区（Column/Row/List/Grid/卡片/输入框/按钮）设置 `systemMaterial` **不会生效**，不要写上了就宣称“已适配”。
+2. **禁止伪造**：不得在内容区用 `linearGradient` + 自绘 `EdgeColors` rim + `hdsEffect` 点光源 + 手调 rgba 组合，模拟/冒充系统材质。这类实现只能称为“兜底玻璃”，不能称为“沉浸式系统材质”。
+3. **内容区兜底写法**：确实需要玻璃观感时，按官方 FAQ 只使用：
+   - 半透明 `backgroundColor`；
+   - 官方 `backgroundBlurStyle`（卡片/容器）或 `backdropBlur`（输入框）；
+   - 普通 `border` / `shadow`。
+   代码注释必须写明“内容区 systemMaterial 不生效，使用官方兜底”。
+4. **开关写法**：应用级开关必须在 entry `module.json5` 显式配置
+   `metadata: { name: "ohos.arkui.UIMaterial.state", value: "enable" }`；
+   组件级关闭用 `uiMaterial.Material.empty`，不要传 `undefined`（`undefined` 只是恢复默认，不等于关闭）。
+5. **存量说明**：`components/GlassCard.ets`、`utils/ImmersiveStyles.ets` 等现有手绘配方是历史兜底实现，不是系统材质；**不得再复制到新页面**，后续逐步替换为官方材质（能进入生效范围的）或官方兜底。
+
 历史包袱：项目里同时存在 V1/V2 组件模型、四份「玻璃卡片」配方、两套 Toast API、
 以及有/无返回按钮两种页面骨架，视觉与交互都在分裂。现已收敛出**唯一实现**，
 新页面照抄下面这套骨架即可，**不要再自建卡片、不要再直接调 Toast API**：
@@ -413,13 +433,16 @@ hdc shell "uitest dumpLayout -p /data/local/tmp/l.xml"  # 看元素 bounds 是�
 | 组件模型 | `@ComponentV2` + `@Local` / `@Param` / `@Event` | V1 仅存于尚未迁移的旧页面 |
 | 页面背景 | `components/WallpaperHost.ets` | 根节点包一层，内容容器 `backgroundColor(Color.Transparent)` |
 | 页面标题栏 | `components/PageHeader.ets` | 玻璃圆底返回键 + 标题 + 副标题；`Index` 已 `hideNavBar(true)`，**不写标题栏就没有可见返回键** |
-| 卡片 | `components/GlassCard.ets` | 沉浸光感唯一配方（基底→官方 `backgroundBlurStyle`→光感渐变→rim 亮边→点光源→投影）；内容区不在 `systemMaterial` 生效范围，不要硬套 |
+| 卡片 | `components/GlassCard.ets` | 内容区**兜底玻璃**（非系统材质；基底 + 官方 `backgroundBlurStyle` + 普通 border/shadow）；存量实现，不再作为新页面模板；**禁止**再自绘渐变/rim/点光源 |
+| 沉浸光感 | 官方 `systemMaterial` / `uiMaterial.ImmersiveMaterial`（仅官方生效区域）；内容区 `backgroundColor` + `backgroundBlurStyle` / `backdropBlur` 兜底 | **强制**：不得伪造系统材质，见 §5.8.0；Dialog/Toast 走官方材质 |
 | 底部悬浮 Tab 栏 | `pages/HomePage.ets` 的 `mainTabs / officialBarTabs` | 216vp 固定短宽度 + 滑动玻璃胶囊；官方材质 + 低版本兜底，详见 §6.15 |
 | 按钮 | `components/GlassButton.ets` | 内层高斯模糊背景透上来；可配 `bgColor`/`textColor`/`strokeWidth`/`strokeColor`/`blurRadius`/`padX` |
-| 输入框 | `utils/ImmersiveStyles.ets` 的 `inputBg/inputBlur/inputRim/inputRadius` | 半透明底 + 背景高斯模糊 + rim 亮边；**禁止**再用不透明的 `comp_background_gray` / `background_primary` |
+| 输入框 | `utils/ImmersiveStyles.ets` 的 `inputBg/inputBlur/inputRadius` | 半透明底 + `backdropBlur` + 普通 border；**禁止**再用不透明的 `comp_background_gray` / `background_primary`；新增代码不要再叠加自绘 rim |
 | 分组列表 | `components/SettingGroup.ets` | 需要自动分割线的设置项用这个（同一配方的 List 变体） |
 | 轻提示 | `utils/Toast.ets` 的 `Toast.show('...')` | 走 `UIContext.getPromptAction()`；**禁止**再用 `promptAction.showToast` / `ToastUtil` |
 | 底部安全区 | `utils/SafeArea.ets` 的 `SafeArea.bottom()` | 带 `px` 单位字符串，页面自己加 |
+
+> 上表中 `GlassCard` / `GlassButton` / `PageHeader` / `ImmersiveStyles` 的玻璃层都属于**内容区兜底**，不是系统材质；新页面不得把它们描述为“沉浸式系统材质”，也不得再复制其自绘渐变/rim/点光源配方。  
 
 标准骨架（以 `pages/StringConverter.ets` 为参考实现）：
 
@@ -521,8 +544,10 @@ TextArea({ text: this.inputUrl, placeholder: '输入…' })
   .border({ width: 1, color: ImmersiveStyles.inputRim(this.isDark) })
 ```
 
-> 需要 `this.isDark` 的页面要自己订阅一次深浅色（`mediaquery.matchMediaSync('(display-mode: dark)')`），
-> 并在 `aboutToDisappear` 里 `off('change')`。全应用输入框已统一走这套（含 `H5Page` / `QrCodePage` /
+> 需要 `this.isDark` 的页面要自己订阅一次深浅色（`mediaquery.matchMediaSync('(dark-mode: true)')`），
+> 并在 `aboutToDisappear` 里 `off('change')`。**禁止使用 `(display-mode: dark)`**——它是 PWA 显示模式，
+> 在系统深色下 `matches` 仍为 false，会导致关闭光感时出现“黑底黑字/白底白字”（2026-11-22 已全应用替换）。
+> 全应用输入框已统一走这套（含 `H5Page` / `QrCodePage` /
 > `StringConverter` / `AppLinkingTool` / `LocalWebPage` 对话框与编辑器 / `HdcDebugPage` 的 IP·Port）。
 > **例外**：`HdcDebugPage` 终端内的命令行输入框保持不透明——它嵌在不透明的控制台面里，
 > 单独改会与所在面板割裂。
@@ -1184,8 +1209,8 @@ Surface，HUD、按钮、弹窗、调试面板都不能是 ArkUI 控件。
 8. **尺寸用 `getSurfaceSize()`** 拿实际像素再换算 vp，不要依赖 ArkTS `onAreaChange`
    （本机 XComponent 上不触发）。
 
-**入口可见性**：dev target 默认可见；AG（`IS_AG_TARGET`）默认隐藏，与 AdsKit/Router/HDC 一样
-靠「设置页 5 秒内连点 8 次」解锁（`SpKeys.ENABLE_GAME_DEMO_VISIBLE`）。
+**入口可见性**：所有 target 默认隐藏（dev 也不再默认展示），与 AdsKit/Router 一样
+靠「设置页 5 秒内连点 8 次」解锁（`SpKeys.ENABLE_GAME_DEMO_VISIBLE`）；升级到显隐策略版本 2 时会一次性清掉历史解锁标记。
 
 **状态栏与图标**：游戏页进入时用 `setWindowSystemBarProperties({ statusBarColor: '#07090F',
 statusBarContentColor: '#FFFFFF' })` 把状态栏切成深色 + 白图标，退出时恢复；入口图标放在
@@ -1645,6 +1670,15 @@ $r('app.string.setting_tab')
 | release 哈希 | 不得出现 `TEST_HASH`；由 CMake 按 `CMAKE_BUILD_TYPE` 分流（§13.8） |
 | 产物 | 不得再打包已删除的 `libhdc_napi.so`（Rust 旧实现） |
 
+**沉浸光感（强制，详见 §5.8.0）**：
+
+| 关注点 | 约定 |
+|---|---|
+| 官方材质 | 只在 Navigation/NavDestination 标题栏、底部 TabBar、Dialog/Toast 等生效区域使用 `systemMaterial` / `uiMaterial.ImmersiveMaterial` |
+| 内容区 | 禁止自绘 `linearGradient` + rim + `hdsEffect` 点光源冒充系统材质；只用 `backgroundColor` + `backgroundBlurStyle`/`backdropBlur` + 普通 border/shadow |
+| 应用级开关 | entry `module.json5` 必须显式配置 `ohos.arkui.UIMaterial.state = enable` |
+| 关闭材质 | 用 `uiMaterial.Material.empty`，不要用 `undefined` |
+
 ---
 
 ## 13. 状态持久化分析 (2026-06-28)
@@ -1745,7 +1779,8 @@ export class SpKeys {
 > 新增持久化键一律加在 `constant/SpKeys.ets`，不要在页面里写字符串字面量。
 > 现有键：隐私同意、扫码入口、HDC 入口、悬浮时钟/压测、Web 服务与其传输上限、自启动总开关、
 > 工具卡顺序、HDC 抓取日志开关、**HDC 终端字号 `hdc_term_font_size`**、壁纸路径与模糊度、
-> 光感档位、二维码/H5/App Linking 历史、App Linking 拉起方式。
+> 光感档位、二维码/H5/App Linking 历史、App Linking 拉起方式、开发者入口显隐
+> （AdsKit/Router/游戏 + 策略版本 `dev_entry_visibility_version`）。
 
 ## 14. 自动化测试
 
@@ -1874,3 +1909,68 @@ export class SpKeys {
 - 验证 UI 前先确认前台是 `.dev` 包（`aa dump -l` / `ps -ef`）；
   dev/release 同时安装时，截图可能落在 release 包上。
 
+
+---
+
+## 16. Markdown 笔记 HSP（2026-11-22）
+
+> 完整设计与验证记录：`docs/superpowers/specs/2026-11-22-markdown-notes-hsp.md`
+
+### 16.1 模块与边界
+
+- `notes_hsp` 是 `type: "shared"` 的 HSP，导出 `NotesFeature`（完整功能组件）与 `NotesSdk`（门面）。
+- 宿主 `pages/MarkdownNotesPage.ets` 只做：HMRouter 注册、`WallpaperHost`、传 `SafeArea.bottom()`、`HMRouterMgr.pop()`。
+- 没有做“HSP 页面跳转”：HMRouter 跨 HSP 路由有版本/路由表风险；组件导出方案更稳，功能 UI 仍全在 HSP。
+- HAP 首页入口：`HomePage` 的「Markdown」工具卡；`PageNames.MARKDOWN_NOTES_PAGE = 'markdownNotesPage'`。
+
+### 16.2 存储
+
+```
+<filesDir>/markdown_notes/
+  index.json      // NoteMeta[]：id/title/createdAt/updatedAt/chars/snippet
+  <id>.md         // 原始 Markdown
+  .seeded         // 首次示例已写标记，避免删空后反复 seed
+```
+
+- 一篇一文件；index 只存元数据；保存时先写 `.tmp`，再 `unlink + rename`。
+- `index.json` 损坏时扫描 `.md` 重建。
+- 自动保存：编辑停止 1.2s；保存按钮/返回列表/组件销毁时也会 flush。
+- 首次启动 seed 一篇欢迎笔记，覆盖标题/列表/任务/引用/代码块/表格/LaTeX，作为渲染自检。
+
+### 16.3 Markdown SDK
+
+- 依赖：`@luvi/lv-markdown-in@3.4.6`（MIT），只声明在 `notes_hsp/oh-package.json5`，HAP 不直接依赖。
+- 预览：`Markdown({ text, controller })`，text 模式；**不**用 rawfile/sandbox 模式。
+- `setThreadRenderEnable(false)`：避免 HSP 内 Worker 路径依赖；笔记场景够用。
+- `setMermaidEnable(false)`：运行时不启用；资源仍会打包。
+- 代码复制：SDK 从 3.1.0 起不再直接写剪贴板，注册 `setCodeCopyListener` + `pasteboard`。
+- `Markdown` 是 V1 组件，`NotesFeature` 是 V2；只在预览分支创建，且切页销毁重建，避免依赖 V1/V2 跨版本实时状态同步。
+- 体积：HSP 约 33.5MB（signed）/30MB（unsigned），主要来自 Mermaid 3.2MB + LaTeX/Prism 仓颉原生库（arm64+x86_64）。release `.app` 压缩后约 15.8MB。
+
+### 16.4 构建与安装（容易踩）
+
+- `notes_hsp` 是 HSP，**HAP 和 HSP 必须一起安装**；只 `hdc install` HAP 会缺模块。
+- `build-dev.bat` / `build-ag-debug.bat` 已改成：先 `assembleHsp`，再 `assembleHap`，然后 `hdc file send` 两个包 + `bm install -r -p <hap> <hsp>`。
+- 两个脚本现在要求显式 target：`build-dev.bat 192.168.3.144:12345`（符合仓库 hdc `-t` 约定）。
+- `build-ag-release.bat` 用 `assembleApp`，HSP 自动进 `.app`。
+- `tools/verify_build.ps1` 也已补 HSP 构建与联合安装；真机冒烟前会断言 `notes_hsp/build/dev/.../notes_hsp-default-signed.hsp` 存在。
+- 构建 HAP 本身不会自动产出 HSP；单独构建某个 product 时，记得先跑 `notes_hsp` 的 `assembleHsp`，否则安装会缺包。
+
+### 16.5 已知限制
+
+- 没有导入/导出、图片插入、标签/置顶、加密、云同步。
+- 大文本/大量笔记未做性能压测；HSP 体积优化（ABI/Mermaid/轻量 SDK）未做。
+- 深色模式已验收（含光感关闭）；平板/2in1 布局未逐项验收。
+
+### 16.6 沉浸光感与深色模式（2026-11-22 修复）
+
+> 本节是 §5.8.0「不得伪造系统材质」的应用实例；后续页面不得再复制这套自绘配方。
+
+- **深色判断必须用 `(dark-mode: true)`**，不是 `(display-mode: dark)`；后者是 PWA 显示模式，会导致系统深色下 `isDark` 仍为 false，出现“黑底黑字/白底白字（关闭光感时最明显）”。2026-11-22 已把主应用 16 处与 `notes_hsp` 全部统一为 `(dark-mode: true)` + `on('change')`。
+- HAP 通过 `MarkdownNotesPage` 的 `lightSense: LightSense.getLevel()` 把全局光感档位传给 `NotesFeature`；HSP 不读 HAP 的 `LightSense` 单例（HAR/HSP 拷贝不共享）。
+- 应用级开关：entry `module.json5` 配 `metadata: { name: "ohos.arkui.UIMaterial.state", value: "enable" }`，Dialog/Toast 等官方支持组件自动使用系统材质。
+- 官方 `systemMaterial` 只在 Navigation/NavDestination 标题栏、底部 TabBar、Dialog/Toast 等容器生效；普通页面内容区不生效。笔记的删除确认已改为官方 `AlertDialog + uiMaterial.ImmersiveMaterial`。
+- 内容区卡片/输入框/预览按官方 FAQ 兜底：半透明 `backgroundColor` + `backgroundBlurStyle`/`backdropBlur` + 普通 border/shadow；**不再**自绘光感渐变、rim 亮边、`hdsEffect` 点光源。
+- `NotesTheme` 只剩兜底浓度/模糊档位/圆角/文字色；全局光感档位仍由 HAP 的 `LightSense.getLevel()` 传给 `NotesFeature`。
+- Markdown 深色适配要同时改：代码块主题、LaTeX 颜色、引用文字/边框、表格背景/表头/隔行/边框、行内代码背景；只改 `setTextColor` 不够。
+- V2 嵌套 `@Builder` 不建立 `@Local` 响应式依赖：`编辑/预览` 分段控件已拆成独立 `EditorToolbar` 组件，避免“内容切到预览、高亮还在编辑”。

@@ -45,4 +45,6 @@ export class SpKeys {
   public static readonly ENABLE_ROUTER_DEMO_VISIBLE: string = 'enable_router_demo_visible';
   /** 模拟游戏入口是否已通过设置页连点解锁（默认隐藏）。 */
   public static readonly ENABLE_GAME_DEMO_VISIBLE: string = 'enable_game_demo_visible';
+  /** 开发者入口显隐策略版本：升级时一次性重置历史解锁标记，之后仍可用连点彩蛋重新解锁。 */
+  public static readonly DEV_ENTRY_VISIBILITY_VERSION: string = 'dev_entry_visibility_version';
 }

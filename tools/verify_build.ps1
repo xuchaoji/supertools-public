@@ -90,8 +90,18 @@ if ($Clean) {
 $devHap = 'main/build/dev/outputs/dev/main-dev-signed.hap'
 $agHap = 'main/build/default/outputs/product/main-product-signed.hap'
 $relHap = 'main/build/release/outputs/product/main-product-signed.hap'
+$devHsp = 'notes_hsp/build/dev/outputs/default/notes_hsp-default-signed.hsp'
+$agHsp = 'notes_hsp/build/default/outputs/default/notes_hsp-default-signed.hsp'
+$relHsp = 'notes_hsp/build/release/outputs/default/notes_hsp-default-signed.hsp'
 
 if (-not $SkipBuild) {
+    Write-Step '构建链 1a/3：notes_hsp（dev）'
+    $devHspCode = Invoke-Hvigor @(
+        '--mode', 'module', '-p', 'module=notes_hsp@default', '-p', 'product=dev',
+        '-p', 'buildMode=debug',
+        'assembleHsp', '--analyze=normal', '--parallel', '--incremental', '--daemon')
+    Test-Assert 'notes_hsp dev 编译通过' ($devHspCode -eq 0)
+
     Write-Step '构建链 1/3：dev（Debug）'
     $devCode = Invoke-Hvigor @(
         '--mode', 'module', '-p', 'module=main@dev', '-p', 'product=dev',
@@ -99,12 +109,26 @@ if (-not $SkipBuild) {
         'assembleHap', '--analyze=normal', '--parallel', '--incremental', '--daemon')
     Test-Assert 'dev 编译通过' ($devCode -eq 0) '（若报无法解析某个 .so 模块，多半是陈旧缓存：用 -Clean 重跑）'
 
+    Write-Step '构建链 2a/3：notes_hsp（product=default）'
+    $agHspCode = Invoke-Hvigor @(
+        '--mode', 'module', '-p', 'module=notes_hsp@default', '-p', 'product=default',
+        '-p', 'buildMode=debug',
+        'assembleHsp', '--analyze=normal', '--parallel', '--incremental', '--daemon')
+    Test-Assert 'notes_hsp default 编译通过' ($agHspCode -eq 0)
+
     Write-Step '构建链 2/3：ag-debug（product=default，Debug）'
     $agCode = Invoke-Hvigor @(
         '--mode', 'module', '-p', 'module=main@product', '-p', 'product=default',
         '-p', 'buildMode=debug', '-p', 'requiredDeviceType=phone',
         'assembleHap', '--analyze=normal', '--parallel', '--incremental', '--daemon')
     Test-Assert 'ag-debug 编译通过' ($agCode -eq 0) '（DevEco 默认选中的就是这个产品）'
+
+    Write-Step '构建链 3a/3：notes_hsp（release）'
+    $relHspCode = Invoke-Hvigor @(
+        '--mode', 'module', '-p', 'module=notes_hsp@default', '-p', 'product=release',
+        '-p', 'buildMode=release',
+        'assembleHsp', '--analyze=normal', '--parallel', '--incremental', '--daemon')
+    Test-Assert 'notes_hsp release 编译通过' ($relHspCode -eq 0)
 
     Write-Step '构建链 3/3：release（Release）'
     $relCode = Invoke-Hvigor @(
@@ -174,8 +198,14 @@ if ($Device) {
     Write-Step "真机冒烟 ($Device)"
     $bundle = 'com.xuchaoji.hmos.supertools.dev'
 
-    $installOut = hdc -t $Device install -r $devHap 2>&1 | Out-String
-    Test-Assert 'dev 包安装成功' ($installOut -match 'install bundle successfully') $installOut.Trim()
+    $installOut = ''
+    Test-Assert 'dev HSP 已产出' (Test-Path $devHsp) $devHsp
+    if (Test-Path $devHsp) {
+        hdc -t $Device file send $devHap /data/local/tmp/main-dev-signed.hap | Out-Null
+        hdc -t $Device file send $devHsp /data/local/tmp/notes_hsp-default-signed.hsp | Out-Null
+        $installOut = hdc -t $Device shell "bm install -r -p /data/local/tmp/main-dev-signed.hap /data/local/tmp/notes_hsp-default-signed.hsp" 2>&1 | Out-String
+    }
+    Test-Assert 'dev 包安装成功（HAP + HSP）' ($installOut -match 'install bundle successfully') $installOut.Trim()
 
     hdc -t $Device shell hilog -r | Out-Null
     hdc -t $Device shell power-shell wakeup | Out-Null

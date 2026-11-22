@@ -6,7 +6,8 @@
   "author": "",
   "license": "",
   "dependencies": {
-    "libhdc_z.so": "file:./src/main/cpp/types/libhdc_z"
+    "libhdc_z.so": "file:./src/main/cpp/types/libhdc_z",
+    "notes_hsp": "file:../notes_hsp"
   }
 }
 

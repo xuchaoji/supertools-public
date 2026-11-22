@@ -1,0 +1,11 @@
+{
+  "name": "notes_hsp",
+  "version": "1.0.0",
+  "description": "Markdown 笔记 HSP：本地笔记存储 + lv-markdown-in 渲染",
+  "main": "Index.ets",
+  "author": "super tools",
+  "license": "MIT",
+  "dependencies": {
+    "@luvi/lv-markdown-in": "3.4.6"
+  }
+}
