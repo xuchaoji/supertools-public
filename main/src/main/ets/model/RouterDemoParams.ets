@@ -52,6 +52,6 @@ export class RouterLaunchParams {
    * - `adTimeout`：广告组件长时间没有展示回调的兜底
    */
   closeReason: string = '';
-  /** 实际展示的开屏广告位 ID（u7w58nlimb / f068vmywiu；无广告时为空） */
+  /** 实际展示的开屏广告位 ID（SPLASH_AD_IDS 中的一项；无广告时为空） */
   adSlot: string = '';
 }

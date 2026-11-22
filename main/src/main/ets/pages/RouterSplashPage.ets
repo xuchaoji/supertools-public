@@ -11,13 +11,21 @@ import { Toast } from '../utils/Toast';
 const TAG: string = 'RouterSplashPage';
 /**
  * 开屏广告位（按顺序尝试）：
- * 1. u7w58nlimb：主开屏广告位；
- * 2. f068vmywiu：主广告位无填充/加载失败时的备用广告位。
- * 两个都拿不到广告时退回默认开屏，避免模拟启动流程卡死。
+ * 前一个广告位无填充/加载失败/超时后自动请求下一个，全部失败才退回默认开屏。
+ * 顺序即优先级，可按运营需要调整。
  */
-const SPLASH_AD_IDS: string[] = ['u7w58nlimb', 'f068vmywiu'];
-/** 单个广告位的请求超时：超时后尝试下一个广告位 */
-const AD_LOAD_TIMEOUT_MS: number = 4000;
+const SPLASH_AD_IDS: string[] = [
+  'a6nfdbcp99',
+  'h8v32virip',
+  'u7w58nlimb',
+  'f068vmywiu',
+  'r145sz31dp',
+  'g3tl51sqih'
+];
+/** 单个广告位的请求超时 */
+const AD_LOAD_TIMEOUT_MS: number = 3000;
+/** 所有广告位的总请求预算：超过后不再继续尝试，直接走默认开屏 */
+const AD_LOAD_BUDGET_MS: number = 9000;
 /** 广告渲染保护：AdComponent 挂载后迟迟没有 onAdOpen/onAdClose 时兜底进主页 */
 const AD_RENDER_GUARD_MS: number = 15000;
 /** 拿不到广告时的默认开屏时长（秒），仅用于兜底，不是广告时长 */
@@ -40,7 +48,7 @@ const PHASE_FALLBACK: string = 'fallback';
  *   `@kit.AdsKit` 的导包换成项目集成的 `@hw-ads/ads`）：
  *   全屏广告铺满整页，半屏广告占页面上方，媒体品牌位放在下方；
  * - 跳转时机由广告 `onStatusChanged` 的 `onAdClose` 驱动，不再用固定倒计时；
- * - 广告位：按顺序尝试 `u7w58nlimb`、`f068vmywiu`，两个都没有广告时退回默认开屏；
+ * - 广告位：按 `SPLASH_AD_IDS` 顺序尝试 6 个候选广告位，全部没有广告时退回默认开屏；
  * - 兜底：广告请求失败/超时/展示失败时回到原来的 5 秒默认开屏，保证演示流程
  *   在没有广告填充（模拟器、无网）时也能走完；
  * - 用 `replaceUrl` 而不是 `pushUrl` 进主页：开屏页被主页**替换**，
@@ -66,6 +74,8 @@ struct RouterSplashPage {
   private renderGuardId: number = -1;
   /** 当前正在请求的广告位下标（SPLASH_AD_IDS） */
   private slotIndex: number = -1;
+  /** 本轮开屏广告请求的起始时间，用于控制总预算 */
+  private adLoadStartTs: number = 0;
   /** 每个广告位的失败原因，全部失败时合并展示 */
   private slotFailures: string[] = [];
   /** 实际拿到广告的广告位 ID，随启动参数带到主页便于核对 */
@@ -117,6 +127,7 @@ struct RouterSplashPage {
       return;
     }
     this.adRequested = true;
+    this.adLoadStartTs = Date.now();
     this.tryLoadSlot(0);
   }
 
@@ -127,6 +138,12 @@ struct RouterSplashPage {
     }
     if (index >= SPLASH_AD_IDS.length) {
       this.fallback('开屏广告位均无填充');
+      return;
+    }
+    if (Date.now() - this.adLoadStartTs >= AD_LOAD_BUDGET_MS) {
+      const summary: string = this.slotFailures.length > 0 ?
+        `开屏广告位均不可用：${this.slotFailures.join('；')}` : '开屏广告加载超时';
+      this.fallback(summary);
       return;
     }
     const adId: string = SPLASH_AD_IDS[index];
@@ -188,7 +205,9 @@ struct RouterSplashPage {
     const failure: string = `广告位 ${SPLASH_AD_IDS[index]} ${reason}`;
     this.slotFailures.push(failure);
     console.warn(`[${TAG}] ${failure}`);
-    if (index + 1 < SPLASH_AD_IDS.length) {
+    const hasNext: boolean = index + 1 < SPLASH_AD_IDS.length;
+    const budgetLeft: boolean = Date.now() - this.adLoadStartTs < AD_LOAD_BUDGET_MS;
+    if (hasNext && budgetLeft) {
       this.tryLoadSlot(index + 1);
       return;
     }
@@ -234,9 +253,12 @@ struct RouterSplashPage {
     }
   }
 
-  /** 单个广告位的请求超时：没等到回调时切到下一个广告位 */
+  /** 单个广告位的请求超时：没等到回调时切到下一个广告位（受总预算约束） */
   private armLoadGuard(index: number): void {
     this.clearLoadGuard();
+    const elapsed: number = Date.now() - this.adLoadStartTs;
+    const remaining: number = AD_LOAD_BUDGET_MS - elapsed;
+    const timeout: number = Math.min(AD_LOAD_TIMEOUT_MS, Math.max(500, remaining));
     this.loadGuardId = setTimeout(() => {
       this.loadGuardId = -1;
       if (this.pageGone || this.jumped || this.phase !== PHASE_LOADING || this.slotIndex !== index) {
@@ -244,7 +266,7 @@ struct RouterSplashPage {
       }
       console.warn(`[${TAG}] splash load timeout id=${SPLASH_AD_IDS[index]}`);
       this.advanceSlot(index, '请求超时');
-    }, AD_LOAD_TIMEOUT_MS);
+    }, timeout);
   }
 
   /** 广告渲染保护：AdComponent 挂载后连 onAdOpen 都没有时，别让开屏页永久卡住 */
@@ -517,6 +539,8 @@ struct RouterSplashPage {
           .fontSize(11)
           .fontColor('rgba(255, 255, 255, 0.52)')
           .textAlign(TextAlign.Center)
+          .maxLines(5)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
           .padding({ left: 12, right: 12 })
       }
       Text('已切换为默认开屏')
