@@ -4,7 +4,7 @@
     "products": [
       {
         "name": "default",
-        "targetSdkVersion": "5.0.5(17)",
+        "targetSdkVersion": "26.0.0",
         "compatibleSdkVersion": "5.0.5(17)",
         "runtimeOS": "HarmonyOS",
         "bundleName": "com.xuchaoji.hmos.supertools",
@@ -18,7 +18,7 @@
       },
       {
         "name": "dev",
-        "targetSdkVersion": "5.0.5(17)",
+        "targetSdkVersion": "26.0.0",
         "compatibleSdkVersion": "5.0.5(17)",
         "runtimeOS": "HarmonyOS",
         "bundleName": "com.xuchaoji.hmos.supertools.dev",
@@ -33,7 +33,7 @@
       },
       {
         "name": "release",
-        "targetSdkVersion": "5.0.5(17)",
+        "targetSdkVersion": "26.0.0",
         "compatibleSdkVersion": "5.0.5(17)",
         "runtimeOS": "HarmonyOS",
         "bundleName": "com.xuchaoji.hmos.supertools",
@@ -48,7 +48,7 @@
     ],
     "buildModeSet": [
       {
-        "name": "debug"
+        "name": "debug",
       },
       {
         "name": "release"
@@ -71,6 +71,20 @@
           "name": "dev",
           "applyToProducts": [
             "dev"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "notes_hsp",
+      "srcPath": "./notes_hsp",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default",
+            "dev",
+            "release"
           ]
         }
       ]

@@ -136,6 +136,22 @@
           ]
         }
       ]
+    },
+    {
+      // Markdown 笔记 HSP：必须显式登记在根 build-profile 的 modules 中，
+      // 否则其他机器 clone 后 hvigor 不认识这个模块，main 依赖 notes_hsp 会编译失败。
+      "name": "notes_hsp",
+      "srcPath": "./notes_hsp",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default",
+            "dev",
+            "release"
+          ]
+        }
+      ]
     }
   ]
 }
