@@ -27,8 +27,8 @@ const TAG: string = 'RouterDemoPage';
  *              └─ router.pushUrl ──> pages/RouterDemoPage（本页，router 管理）
  *                    ├─ router.pushUrl ──> pages/RouterDemoDetailPage（详情页）
  *                    │     └─ router.back({ url, params }) 回传结果
- *                    └─ router.pushUrl ──> pages/RouterSplashPage（模拟开屏，5 秒）
- *                          └─ router.replaceUrl ──> pages/RouterMainPage（模拟主页）
+ *                    └─ router.pushUrl ──> pages/RouterSplashPage（开屏广告）
+ *                          └─ onAdClose ──> router.replaceUrl ──> pages/RouterMainPage（模拟主页）
  *
  * router 页面与 HMRouter 页面是两套独立的页面栈：
  * - router 入栈/出栈只会让下方的 HMRouter 根页面走 onPageHide/onPageShow，
@@ -143,7 +143,8 @@ struct RouterDemoPage {
   /**
    * 模拟应用启动流程：push 开屏页。
    *
-   * RouterSplashPage 停留 5 秒（广告时长占位）后会 replaceUrl 到 RouterMainPage，
+   * RouterSplashPage 会请求并展示 @hw-ads/ads 开屏广告，收到 onAdClose 后
+   * replaceUrl 到 RouterMainPage；没有广告填充时走 5 秒默认开屏兜底。
    * 因此本页只需负责把开屏页压栈，跳主页的逻辑由开屏页自己完成。
    */
   private openSplash(): void {
@@ -282,7 +283,7 @@ struct RouterDemoPage {
                   }
                 })
 
-                Text('RouterSplashPage 停留 5 秒（后续接入开屏广告）→ RouterMainPage')
+                Text('RouterSplashPage 展示开屏广告 → onAdClose 后 replaceUrl → RouterMainPage')
                   .fontSize(11)
                   .fontColor($r('sys.color.font_secondary'))
                   .width('100%')
@@ -331,7 +332,7 @@ struct RouterDemoPage {
                   this.tipRow('入栈', 'router.pushUrl 把页面压入 router 页面栈，并携带可序列化参数')
                   this.tipRow('取参', '目标页 aboutToAppear / onPageShow 中调用 router.getParams()')
                   this.tipRow('出栈', 'router.back() 返回上一页；router.back({ url, params }) 可回传结果')
-                  this.tipRow('启动', '模拟应用打开 → 开屏页 5 秒后 replaceUrl 主页（栈内不留开屏页）')
+                  this.tipRow('启动', '模拟应用打开 → 开屏广告 onAdClose 后 replaceUrl 主页（栈内不留开屏页）')
                   this.tipRow('注册', 'router 页面必须写进 main_pages.json，HMRouter 页面则不需要')
                 }
                 .width('100%')

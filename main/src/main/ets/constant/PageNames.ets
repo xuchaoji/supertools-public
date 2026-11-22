@@ -25,8 +25,8 @@ export class PageNames {
   // 供 router.pushUrl / router.back 按路径跳转使用。
   public static readonly ROUTER_DEMO_PAGE: string = 'pages/RouterDemoPage';
   public static readonly ROUTER_DEMO_DETAIL_PAGE: string = 'pages/RouterDemoDetailPage';
-  /** 模拟应用启动：开屏页（5 秒，后续接入开屏广告） */
+  /** 模拟应用启动：开屏页（展示 @hw-ads/ads 开屏广告，onAdClose 后进主页） */
   public static readonly ROUTER_SPLASH_PAGE: string = 'pages/RouterSplashPage';
-  /** 模拟应用启动：启动完成后的应用主页 */
+  /** 模拟应用启动：启动完成后的应用主页（由开屏页 replaceUrl 进入） */
   public static readonly ROUTER_MAIN_PAGE: string = 'pages/RouterMainPage';
 }

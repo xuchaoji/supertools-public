@@ -42,6 +42,16 @@ export class RouterLaunchParams {
   from: string = '';
   /** 触发时间戳 */
   ts: number = 0;
-  /** 开屏页实际停留秒数（当前固定 5 秒模拟广告时长） */
+  /** 开屏页实际停留秒数（广告展示时长或兜底倒计时） */
   waitedSeconds: number = 0;
+  /**
+   * 开屏结束方式，便于主页直观看到跳转时机：
+   * - `onAdClose:<关闭原因>`：开屏广告关闭回调（正常入口）
+   * - `skip`：用户点了「跳过」
+   * - `fallback`：没有广告填充，走默认开屏倒计时
+   * - `adTimeout`：广告组件长时间没有展示回调的兜底
+   */
+  closeReason: string = '';
+  /** 实际展示的开屏广告位 ID（u7w58nlimb / f068vmywiu；无广告时为空） */
+  adSlot: string = '';
 }

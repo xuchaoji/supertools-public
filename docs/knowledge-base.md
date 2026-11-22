@@ -145,7 +145,7 @@ supertools-public/
 ```
 > **重要**: 通过 `@HMRouter` 注册的页面**不需要**在 `main_pages.json` 中额外注册。仅系统浮窗页面（TYPE_FLOAT window）与**系统 `router` 页面**必须在此注册。
 >
-> `pages/RouterDemoPage` / `pages/RouterDemoDetailPage` / `pages/RouterSplashPage` / `pages/RouterMainPage` 是故意保留的**系统 router 演示页**：工具箱「Router 页面跳转」入口用 `router.pushUrl` 进入，与 HMRouter 的 NavPathStack 互不影响，用于演示两套路由栈共存。其中「模拟应用打开」会进入开屏页，5 秒后 `router.replaceUrl` 到模拟主页（开屏页不留在栈内）。
+> `pages/RouterDemoPage` / `pages/RouterDemoDetailPage` / `pages/RouterSplashPage` / `pages/RouterMainPage` 是故意保留的**系统 router 演示页**：工具箱「Router 页面跳转」入口用 `router.pushUrl` 进入，与 HMRouter 的 NavPathStack 互不影响，用于演示两套路由栈共存。其中「模拟应用打开」会进入开屏页，实际请求 `@hw-ads/ads` 开屏广告（依次尝试广告位 `u7w58nlimb`、`f068vmywiu`），收到 `onAdClose` 回调后 `router.replaceUrl` 到模拟主页（开屏页不留在栈内）；两个广告位都没有填充时用 5 秒默认开屏兜底。
 > **开发者入口默认隐藏**：`Router 页面跳转`、`AdsKit广告测试`、`Ads Hsp广告`、`模拟游戏`四个入口默认不展示；需要「设置页连点彩蛋」（5 秒内在设置 tab 连点 8 次）才会出现。彩蛋解锁状态会持久化，但 `DEV_ENTRY_VISIBILITY_VERSION` 首次升级到 2 时会一次性清理旧版本遗留的解锁标记。
 
 **页面清单 (完整)：**
@@ -155,7 +155,7 @@ supertools-public/
 | `pages/Index.ets` | `@Entry` | main_pages.json | HMNavigation 根容器 |
 | `pages/RouterDemoPage.ets` | `@Entry` | main_pages.json | 系统 router 演示页（第一页） |
 | `pages/RouterDemoDetailPage.ets` | `@Entry` | main_pages.json | 系统 router 演示页（详情/回传结果） |
-| `pages/RouterSplashPage.ets` | `@Entry` | main_pages.json | 模拟应用开屏（5 秒，广告占位） |
+| `pages/RouterSplashPage.ets` | `@Entry` | main_pages.json | 模拟应用开屏（`@hw-ads/ads` 开屏广告，onAdClose 后 replaceUrl 进主页） |
 | `pages/RouterMainPage.ets` | `@Entry` | main_pages.json | 模拟应用主页（replaceUrl 进入） |
 | `pages/FloatBallPage.ets` | `@Entry` | main_pages.json | 浮窗小球 (Web 状态跑马灯) |
 | `pages/GuidePage.ets` | `@Entry` + `@HMRouter` | 路由装饰器 | 隐私协议同意引导页 |

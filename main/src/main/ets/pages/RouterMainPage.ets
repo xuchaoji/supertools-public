@@ -17,7 +17,8 @@ const TAG: string = 'RouterMainPage';
 /**
  * 模拟应用启动流程：启动完成后的「应用主页」。
  *
- * 由 RouterSplashPage 在 5 秒（广告占位时长）后通过 `router.replaceUrl` 进入。
+ * 由 RouterSplashPage 在开屏广告 `onAdClose` 回调后通过 `router.replaceUrl` 进入；
+ * 没有广告填充时，开屏页会走 5 秒默认开屏兜底，同样用 replaceUrl 进来。
  * 使用 replaceUrl 的意义：主页会替换掉栈内的开屏页，所以在这个页面返回时
  * 直接回到 RouterDemoPage，而不会倒退回开屏页。
  *
@@ -99,7 +100,7 @@ struct RouterMainPage {
             Column({ space: 12 }) {
               PageHeader({
                 title: '模拟应用主页',
-                subtitle: 'Splash 停留 5 秒后自动进入本页',
+                subtitle: '开屏广告 onAdClose 后 replaceUrl 进入本页',
                 onBack: () => {
                   this.backToDemo();
                 }
@@ -138,7 +139,7 @@ struct RouterMainPage {
                     .width('100%')
                     .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
-                  Text('RouterSplashPage 在 5 秒后调用 router.replaceUrl 进入本页；开屏页已被替换，返回时会直接回到 Router 演示页。')
+                  Text('RouterSplashPage 展示开屏广告，收到 onAdClose 后调用 router.replaceUrl 进入本页；开屏页已被替换，返回时会直接回到 Router 演示页。')
                     .fontSize(12)
                     .fontColor($r('sys.color.font_secondary'))
                     .lineHeight(18)
@@ -164,6 +165,13 @@ struct RouterMainPage {
                     .width('100%')
                     .lineHeight(18)
                     .wordBreak(WordBreak.BREAK_ALL)
+                    .textShadow(ImmersiveStyles.textShadow(this.isDark))
+
+                  Text('closeReason 记录开屏结束方式：onAdClose:<关闭原因> / skip / fallback / adTimeout；adSlot 记录实际展示的广告位。')
+                    .fontSize(11)
+                    .fontColor($r('sys.color.font_secondary'))
+                    .lineHeight(16)
+                    .width('100%')
                     .textShadow(ImmersiveStyles.textShadow(this.isDark))
                 }
                 .width('100%')
@@ -258,7 +266,7 @@ struct RouterMainPage {
                     .width('100%')
                     .textShadow(ImmersiveStyles.textShadow(this.isDark))
 
-                  Text('启动流程使用 replaceUrl 进入主页，因此页面栈里只剩“演示页 → 主页”，返回不会重新经历开屏。')
+                  Text('启动流程在开屏广告 onAdClose 回调里用 replaceUrl 进入主页，因此页面栈里只剩“演示页 → 主页”，返回不会重新经历开屏。')
                     .fontSize(11)
                     .fontColor($r('sys.color.font_secondary'))
                     .lineHeight(16)
