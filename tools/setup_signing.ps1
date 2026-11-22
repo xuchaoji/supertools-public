@@ -3,8 +3,10 @@
   准备本机签名配置（build-profile.json5）。
 
 .DESCRIPTION
-  build-profile.json5 不在版本控制内：它含本机签名物料的绝对路径与
-  DevEco 生成的机器绑定加密口令，提交它对别人没用、对本机是泄露。
+  build-profile.json5 以「无签名配置」版本入库：signingConfigs 为空，但 modules
+  已包含 main + notes_hsp，保证其他机器 clone 后能识别 HSP 并编译。
+  本机签名配置只写在工作区，不提交：它含本机签名物料的绝对路径与 DevEco
+  生成的机器绑定加密口令，提交它对别人没用、对本机是泄露。
 
   hvigor 不支持在 build-profile.json5 里 include 外部文件，签名物料必须内联在
   signingConfigs[].material 中，所以「本机配置」就是这一整个文件——把它放到

@@ -1,5 +1,10 @@
 /**
  * 跨平台准备本机签名配置与 Git 保护
+ *
+ * 仓库里的 build-profile.json5 是无签名版本（signingConfigs: []，modules 含
+ * main + notes_hsp）；本脚本负责把本机签名物料写进它，并用 skip-worktree
+ * 防止本机签名配置被提交。
+ *
  * 用法:
  *   node tools/setup_signing.js
  *   node tools/setup_signing.js --from <路径>
